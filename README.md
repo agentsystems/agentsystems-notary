@@ -8,7 +8,7 @@ AgentSystems Witness provides tamper-evident audit trails for AI systems in bank
 
 ## Features
 
-- **LangChain Integration**: Drop-in callback handler for any LangChain model
+- **Multi-Framework Support**: LangChain and CrewAI adapters (extensible to other frameworks)
 - **Dual-Write Architecture**: Vendor S3 (raw logs) + Witness API (hash receipts)
 - **Cryptographic Verification**: SHA-256 hashes with JCS canonicalization (RFC 8785)
 - **Tenant Isolation**: Multi-tenant support with blast radius controls
@@ -21,17 +21,26 @@ This SDK provides technical infrastructure for audit logging. It does not guaran
 ## Installation
 
 ```bash
-pip install agentsystems-witness
+# Install with LangChain support
+pip install agentsystems-witness[langchain]
+
+# Install with CrewAI support
+pip install agentsystems-witness[crewai]
+
+# Install with both
+pip install agentsystems-witness[all]
 ```
 
 ## Quick Start
 
+### LangChain
+
 ```python
-from agentsystems_witness import WitnessCallback
+from agentsystems_witness import LangChainWitness
 from langchain_anthropic import ChatAnthropic
 
-# 1. Create callback handler
-callback = WitnessCallback(
+# 1. Create witness callback
+witness = LangChainWitness(
     api_key="sk_live_...",           # From witness.agentsystems.ai
     tenant_id="tnt_acme_corp",       # Your tenant identifier
     vendor_bucket_name="acme-llm-logs"  # Your S3 bucket
@@ -39,12 +48,34 @@ callback = WitnessCallback(
 
 # 2. Add to any LangChain model
 model = ChatAnthropic(
-    model="claude-sonnet-4",
-    callbacks=[callback]
+    model="claude-sonnet-4-5-20250929",
+    callbacks=[witness]
 )
 
 # 3. Use normally - logs are automatic
 response = model.invoke("What is AIUC-1 compliance?")
+```
+
+### CrewAI
+
+```python
+from agentsystems_witness import CrewAIWitness
+from crewai import Agent, Task, Crew
+
+# 1. Initialize witness (registers hooks automatically)
+witness = CrewAIWitness(
+    api_key="sk_live_...",
+    tenant_id="tnt_acme_corp",
+    vendor_bucket_name="acme-llm-logs"
+)
+
+# 2. Create crew normally
+agent = Agent(role="Research Analyst", goal="...", backstory="...")
+task = Task(description="Research AIUC-1 compliance", agent=agent)
+crew = Crew(agents=[agent], tasks=[task])
+
+# 3. All LLM calls are logged automatically
+crew.kickoff()
 ```
 
 ## How It Works
