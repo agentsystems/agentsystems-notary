@@ -1,30 +1,30 @@
-"""LangChain adapter for Witness compliance logging."""
+"""LangChain adapter for Notary compliance logging."""
 
 from typing import Any, Dict, List
 from langchain_core.callbacks import BaseCallbackHandler
-from .core import WitnessCore
+from .core import NotaryCore
 
 
-class LangChainWitness(BaseCallbackHandler):
+class LangChainNotary(BaseCallbackHandler):
     """
-    LangChain callback handler for Witness compliance logging.
+    LangChain callback handler for Notary compliance logging.
 
     This is a thin adapter that extracts data from LangChain's callback
-    interface and passes it to the framework-agnostic WitnessCore.
+    interface and passes it to the framework-agnostic NotaryCore.
 
     Args:
-        api_key: Witness API key (from witness.agentsystems.ai)
+        api_key: Notary API key (from notary.agentsystems.ai)
         tenant_id: Tenant identifier (e.g., "tnt_acme_corp")
         vendor_bucket_name: S3 bucket name for raw logs
-        api_url: Witness API endpoint (default: production)
+        api_url: Notary API endpoint (default: production)
         debug: Enable debug output (default: False)
 
     Example:
         ```python
-        from agentsystems_witness import LangChainWitness
+        from agentsystems_notary import LangChainNotary
         from langchain_anthropic import ChatAnthropic
 
-        callback = LangChainWitness(
+        callback = LangChainNotary(
             api_key="sk_live_...",
             tenant_id="tnt_acme_corp",
             vendor_bucket_name="acme-llm-logs"
@@ -44,11 +44,11 @@ class LangChainWitness(BaseCallbackHandler):
         api_key: str,
         tenant_id: str,
         vendor_bucket_name: str,
-        api_url: str = "https://witness-api.agentsystems.ai/v1/witness",
+        api_url: str = "https://notary-api.agentsystems.ai/v1/notary",
         debug: bool = False
     ):
         # Initialize framework-agnostic core
-        self.core = WitnessCore(
+        self.core = NotaryCore(
             api_key=api_key,
             tenant_id=tenant_id,
             vendor_bucket_name=vendor_bucket_name,
@@ -71,7 +71,7 @@ class LangChainWitness(BaseCallbackHandler):
 
     def on_llm_end(self, response: Any, **kwargs: Any) -> None:
         """
-        Capture LLM response and log to Witness.
+        Capture LLM response and log to Notary.
 
         Extracts response from LangChain's response object and calls
         the framework-agnostic core logging method.

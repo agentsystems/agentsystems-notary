@@ -1,7 +1,7 @@
-"""CrewAI adapter for Witness compliance logging."""
+"""CrewAI adapter for Notary compliance logging."""
 
 from typing import Any, Dict, Optional
-from .core import WitnessCore
+from .core import NotaryCore
 
 try:
     from crewai.hooks import before_llm_call, after_llm_call
@@ -10,27 +10,27 @@ except ImportError:
     CREWAI_AVAILABLE = False
 
 
-class CrewAIWitness:
+class CrewAINotary:
     """
-    CrewAI hook handler for Witness compliance logging.
+    CrewAI hook handler for Notary compliance logging.
 
     This is a thin adapter that extracts data from CrewAI's hook context
-    and passes it to the framework-agnostic WitnessCore.
+    and passes it to the framework-agnostic NotaryCore.
 
     Args:
-        api_key: Witness API key (from witness.agentsystems.ai)
+        api_key: Notary API key (from notary.agentsystems.ai)
         tenant_id: Tenant identifier (e.g., "tnt_acme_corp")
         vendor_bucket_name: S3 bucket name for raw logs
-        api_url: Witness API endpoint (default: production)
+        api_url: Notary API endpoint (default: production)
         debug: Enable debug output (default: False)
 
     Example:
         ```python
-        from agentsystems_witness import CrewAIWitness
+        from agentsystems_notary import CrewAINotary
         from crewai import Agent, Task, Crew
 
-        # Initialize witness logging
-        witness = CrewAIWitness(
+        # Initialize notary logging
+        notary = CrewAINotary(
             api_key="sk_live_...",
             tenant_id="tnt_acme_corp",
             vendor_bucket_name="acme-llm-logs"
@@ -51,7 +51,7 @@ class CrewAIWitness:
         api_key: str,
         tenant_id: str,
         vendor_bucket_name: str,
-        api_url: str = "https://witness-api.agentsystems.ai/v1/witness",
+        api_url: str = "https://notary-api.agentsystems.ai/v1/notary",
         debug: bool = False
     ):
         if not CREWAI_AVAILABLE:
@@ -60,7 +60,7 @@ class CrewAIWitness:
             )
 
         # Initialize framework-agnostic core
-        self.core = WitnessCore(
+        self.core = NotaryCore(
             api_key=api_key,
             tenant_id=tenant_id,
             vendor_bucket_name=vendor_bucket_name,
@@ -78,7 +78,7 @@ class CrewAIWitness:
         """Register before/after hooks with CrewAI."""
 
         @before_llm_call
-        def _witness_before_llm(context) -> None:
+        def _notary_before_llm(context) -> None:
             """Capture LLM request from CrewAI context."""
             # Extract messages from context
             messages = []
@@ -100,8 +100,8 @@ class CrewAIWitness:
             return None  # Allow execution
 
         @after_llm_call
-        def _witness_after_llm(context) -> None:
-            """Capture LLM response and log to Witness."""
+        def _notary_after_llm(context) -> None:
+            """Capture LLM response and log to Notary."""
             if self._current_request is None:
                 return None
 

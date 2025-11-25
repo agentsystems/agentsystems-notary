@@ -1,7 +1,7 @@
 [project]
-name = "agentsystems-witness"
+name = "agentsystems-notary"
 version = "0.1.0"
-description = "Audit logging SDK for LLM interactions in regulated industries"
+description = "Cryptographic notarization SDK for LLM interactions in regulated industries"
 readme = "README.md"
 authors = [ { name = "AgentSystems", email = "support@agentsystems.ai" } ]
 license = "Apache-2.0"
@@ -28,7 +28,7 @@ license-files = ["LICENSE"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["agentsystems_witness*"]
+include = ["agentsystems_notary*"]
 
 [build-system]
 requires = ["setuptools>=67", "wheel"]
@@ -36,7 +36,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=agentsystems_witness --cov-report=term-missing --cov-report=html"
+addopts = "--cov=agentsystems_notary --cov-report=term-missing --cov-report=html"
 
 [tool.black]
 line-length = 88

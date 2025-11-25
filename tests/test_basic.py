@@ -1,7 +1,7 @@
-"""Basic tests for agentsystems-witness."""
+"""Basic tests for agentsystems-notary."""
 
 import pytest
-from agentsystems_witness import WitnessCallback, __version__
+from agentsystems_notary import LangChainNotary, __version__
 
 
 def test_version():
@@ -9,40 +9,40 @@ def test_version():
     assert __version__ is not None
 
 
-def test_witness_callback_init():
-    """Test WitnessCallback initialization."""
-    callback = WitnessCallback(
+def test_langchain_notary_init():
+    """Test LangChainNotary initialization."""
+    notary = LangChainNotary(
         api_key="test_key",
         tenant_id="test_tenant",
         vendor_bucket_name="test-bucket"
     )
 
-    assert callback.api_key == "test_key"
-    assert callback.tenant_id == "test_tenant"
-    assert callback.bucket_name == "test-bucket"
-    assert callback.sequence == 0
-    assert callback.session_id is not None
+    assert notary.core.api_key == "test_key"
+    assert notary.core.tenant_id == "test_tenant"
+    assert notary.core.bucket_name == "test-bucket"
+    assert notary.core.sequence == 0
+    assert notary.core.session_id is not None
 
 
-def test_witness_callback_with_custom_url():
-    """Test WitnessCallback with custom API URL."""
-    callback = WitnessCallback(
+def test_langchain_notary_with_custom_url():
+    """Test LangChainNotary with custom API URL."""
+    notary = LangChainNotary(
         api_key="test_key",
         tenant_id="test_tenant",
         vendor_bucket_name="test-bucket",
-        api_url="http://localhost:8000/v1/witness"
+        api_url="http://localhost:8000/v1/notary"
     )
 
-    assert callback.api_url == "http://localhost:8000/v1/witness"
+    assert notary.core.api_url == "http://localhost:8000/v1/notary"
 
 
-def test_witness_callback_debug_mode():
-    """Test WitnessCallback debug mode."""
-    callback = WitnessCallback(
+def test_langchain_notary_debug_mode():
+    """Test LangChainNotary debug mode."""
+    notary = LangChainNotary(
         api_key="test_key",
         tenant_id="test_tenant",
         vendor_bucket_name="test-bucket",
         debug=True
     )
 
-    assert callback.debug is True
+    assert notary.core.debug is True

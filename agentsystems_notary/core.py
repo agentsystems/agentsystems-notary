@@ -1,4 +1,4 @@
-"""Framework-agnostic core logic for Witness compliance logging."""
+"""Framework-agnostic core logic for Notary compliance logging."""
 
 import hashlib
 import uuid
@@ -9,17 +9,17 @@ from datetime import datetime, timezone
 from typing import Any, Dict
 
 
-class WitnessCore:
+class NotaryCore:
     """
-    Framework-agnostic witness logging core.
+    Framework-agnostic notary logging core.
 
     Handles canonicalization, hashing, and dual-write for any AI framework.
 
     Args:
-        api_key: Witness API key (from witness.agentsystems.ai)
+        api_key: Notary API key (from notary.agentsystems.ai)
         tenant_id: Tenant identifier (e.g., "tnt_acme_corp")
         vendor_bucket_name: S3 bucket name for raw logs
-        api_url: Witness API endpoint (default: production)
+        api_url: Notary API endpoint (default: production)
         debug: Enable debug output (default: False)
     """
 
@@ -28,7 +28,7 @@ class WitnessCore:
         api_key: str,
         tenant_id: str,
         vendor_bucket_name: str,
-        api_url: str = "https://witness-api.agentsystems.ai/v1/witness",
+        api_url: str = "https://notary-api.agentsystems.ai/v1/notary",
         debug: bool = False
     ):
         self.api_key = api_key
@@ -54,7 +54,7 @@ class WitnessCore:
         Log an LLM interaction with cryptographic verification.
 
         This is the main entry point called by framework adapters.
-        Performs: canonicalization → hashing → dual-write
+        Performs: canonicalization -> hashing -> dual-write
 
         Args:
             input_data: Framework-specific input (prompts, messages, etc.)
@@ -95,15 +95,15 @@ class WitnessCore:
 
         # 3. Dual-Write
         try:
-            self._upload_and_witness(canonical_bytes, content_hash, payload["metadata"])
+            self._upload_and_notarize(canonical_bytes, content_hash, payload["metadata"])
         except Exception as e:
-            print(f"❌ Witness Log Failed: {e}")
+            print(f"Notary Log Failed: {e}")
 
-    def _upload_and_witness(
+    def _upload_and_notarize(
         self, data_bytes: bytes, content_hash: str, metadata: Dict[str, Any]
     ) -> None:
         """
-        Perform dual-write to vendor S3 and Witness API.
+        Perform dual-write to vendor S3 and Notary API.
 
         Args:
             data_bytes: Canonical JSON bytes to store in S3
@@ -122,12 +122,12 @@ class WitnessCore:
                 Metadata={"hash": content_hash},
             )
             if self.debug:
-                print(f"✅ [Vendor S3] Saved to {self.bucket_name}/{key}")
+                print(f"[Vendor S3] Saved to {self.bucket_name}/{key}")
         except Exception as e:
-            print(f"❌ [Vendor S3] Failed: {e} (Check your AWS credentials)")
+            print(f"[Vendor S3] Failed: {e} (Check your AWS credentials)")
             return
 
-        # B. Neutral Witness (AgentSystems API)
+        # B. Neutral Notary (AgentSystems API)
         try:
             with httpx.Client(timeout=5.0) as client:
                 resp = client.post(
@@ -142,8 +142,8 @@ class WitnessCore:
                 if resp.status_code == 200:
                     receipt = resp.json()["receipt"]
                     if self.debug:
-                        print(f"✅ [Witness] Verified! Receipt: {receipt[:8]}...")
+                        print(f"[Notary] Verified! Receipt: {receipt[:8]}...")
                 else:
-                    print(f"❌ [Witness] Failed ({resp.status_code}): {resp.text}")
+                    print(f"[Notary] Failed ({resp.status_code}): {resp.text}")
         except Exception as e:
-            print(f"❌ [Witness] Connection Error: {e}")
+            print(f"[Notary] Connection Error: {e}")
