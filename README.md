@@ -11,7 +11,7 @@ AgentSystems Notary provides tamper-evident audit trails for AI systems in banki
 - **Multi-Framework Support**: LangChain and CrewAI adapters (extensible to other frameworks)
 - **Dual-Write Architecture**: Vendor S3 (raw logs) + Notary API (hash receipts)
 - **Cryptographic Verification**: SHA-256 hashes with JCS canonicalization (RFC 8785)
-- **Tenant Isolation**: Multi-tenant support with blast radius controls
+- **Tenant Isolation**: Multi-tenant support for SaaS applications
 - **Compliance Support**: Audit trail architecture aligned with AIUC-1 E015 requirements
 
 ## Disclaimer
@@ -41,8 +41,8 @@ from langchain_anthropic import ChatAnthropic
 
 # 1. Create notary callback
 notary = LangChainNotary(
-    api_key="sk_live_...",           # From notary.agentsystems.ai
-    tenant_id="tnt_acme_corp",       # Your tenant identifier
+    api_key="sk_asn_prod_...",        # From notary.agentsystems.ai
+    slug="tnt_acme_corp",             # Your tenant slug
     vendor_bucket_name="acme-llm-logs"  # Your S3 bucket
 )
 
@@ -64,8 +64,8 @@ from crewai import Agent, Task, Crew
 
 # 1. Initialize notary (registers hooks automatically)
 notary = CrewAINotary(
-    api_key="sk_live_...",
-    tenant_id="tnt_acme_corp",
+    api_key="sk_asn_prod_...",
+    slug="tnt_acme_corp",
     vendor_bucket_name="acme-llm-logs"
 )
 
@@ -101,9 +101,9 @@ export AWS_DEFAULT_REGION=us-east-1
 ### Debug Mode
 
 ```python
-callback = NotaryCallback(
-    api_key="sk_live_...",
-    tenant_id="tnt_acme_corp",
+notary = LangChainNotary(
+    api_key="sk_asn_prod_...",
+    slug="tnt_acme_corp",
     vendor_bucket_name="acme-llm-logs",
     debug=True  # Prints canonical JSON and hashes
 )
@@ -115,32 +115,29 @@ For SaaS applications serving multiple end-customers:
 
 ```python
 # Each end-customer gets their own tenant
-callback_bank_a = NotaryCallback(
-    api_key="sk_live_...",           # Your master or scoped key
-    tenant_id="tnt_bank_a",          # Bank A's logs
+notary_bank_a = LangChainNotary(
+    api_key="sk_asn_prod_...",
+    slug="tnt_bank_a",              # Bank A's logs
     vendor_bucket_name="your-logs"
 )
 
-callback_bank_b = NotaryCallback(
-    api_key="sk_live_...",           # Same or different key
-    tenant_id="tnt_bank_b",          # Bank B's logs (isolated)
+notary_bank_b = LangChainNotary(
+    api_key="sk_asn_prod_...",
+    slug="tnt_bank_b",              # Bank B's logs (isolated)
     vendor_bucket_name="your-logs"
 )
 ```
 
 ## API Keys
 
-Generate API keys at [notary.agentsystems.ai](https://notary.agentsystems.ai):
-
-- **Tenant-Scoped Keys**: Limited to specific tenant (recommended)
-- **Master Keys**: Access all tenants (use only for internal systems)
+Generate API keys at [notary.agentsystems.ai](https://notary.agentsystems.ai).
 
 ## S3 Bucket Structure
 
 Vendor bucket (your S3):
 ```
 logs/
-  {tenant_id}/
+  {slug}/
     {session_id}/
       1.json
       2.json

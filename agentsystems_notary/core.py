@@ -17,7 +17,7 @@ class NotaryCore:
 
     Args:
         api_key: Notary API key (from notary.agentsystems.ai)
-        tenant_id: Tenant identifier (e.g., "tnt_acme_corp")
+        slug: Tenant slug (e.g., "tnt_acme_corp")
         vendor_bucket_name: S3 bucket name for raw logs
         api_url: Notary API endpoint (default: production)
         debug: Enable debug output (default: False)
@@ -26,13 +26,13 @@ class NotaryCore:
     def __init__(
         self,
         api_key: str,
-        tenant_id: str,
+        slug: str,
         vendor_bucket_name: str,
         api_url: str = "https://notary-api.agentsystems.ai/v1/notary",
         debug: bool = False
     ):
         self.api_key = api_key
-        self.tenant_id = tenant_id
+        self.slug = slug
         self.bucket_name = vendor_bucket_name
         self.api_url = api_url
         self.debug = debug
@@ -69,7 +69,7 @@ class NotaryCore:
                 "session_id": self.session_id,
                 "sequence": self.sequence,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
-                "tenant_id": self.tenant_id,
+                "slug": self.slug,
                 "vendor_id": "inferred_from_api_key",
                 **(metadata or {})
             },
@@ -108,10 +108,10 @@ class NotaryCore:
         Args:
             data_bytes: Canonical JSON bytes to store in S3
             content_hash: SHA256 hash of canonical bytes
-            metadata: Event metadata (session_id, tenant_id, etc.)
+            metadata: Event metadata (session_id, slug, etc.)
         """
         # A. Vendor Storage (Customer's S3 Bucket)
-        key = f"logs/{self.tenant_id}/{self.session_id}/{self.sequence}.json"
+        key = f"logs/{self.slug}/{self.session_id}/{self.sequence}.json"
 
         try:
             self.s3.put_object(
@@ -135,7 +135,7 @@ class NotaryCore:
                     headers={"X-API-Key": self.api_key},
                     json={
                         "hash": content_hash,
-                        "tenant_id": self.tenant_id,
+                        "slug": self.slug,
                         "metadata": metadata,
                     },
                 )
