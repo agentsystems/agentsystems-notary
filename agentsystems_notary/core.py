@@ -70,7 +70,6 @@ class NotaryCore:
                 "sequence": self.sequence,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "slug": self.slug,
-                "vendor_id": "inferred_from_api_key",
                 **(metadata or {})
             },
             "input": input_data,
