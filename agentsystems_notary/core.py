@@ -110,7 +110,9 @@ class NotaryCore:
             metadata: Event metadata (session_id, slug, etc.)
         """
         # A. Vendor Storage (Customer's S3 Bucket)
-        key = f"logs/{self.slug}/{self.session_id}/{self.sequence}.json"
+        # Path mirrors AgentSystems ledger: {slug}/{YYYY}/{MM}/{DD}/{hash}.json
+        date_path = datetime.now(timezone.utc).strftime('%Y/%m/%d')
+        key = f"{self.slug}/{date_path}/{content_hash}.json"
 
         try:
             self.s3.put_object(
