@@ -137,12 +137,8 @@ class NotaryCore:
             return
 
         # B. Neutral Notary (AgentSystems API)
-        # Skip notarization for test keys - they only write to vendor S3
-        if self.is_test_mode:
-            if self.debug:
-                print("[Notary] Test mode - skipping notarization")
-            return
-
+        # Always call API (handles tenant auto-creation, feed updates)
+        # API will skip ledger write for test keys
         try:
             with httpx.Client(timeout=5.0) as client:
                 resp = client.post(
