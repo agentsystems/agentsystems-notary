@@ -37,12 +37,18 @@ class NotaryCore:
         self.api_url = api_url
         self.debug = debug
 
+        # Detect environment from API key prefix
+        self.is_test_mode = api_key.startswith("sk_asn_test_")
+
         # Initialize S3 client (uses AWS credentials from environment)
         self.s3 = boto3.client("s3")
 
         # Session tracking
         self.session_id = str(uuid.uuid4())
         self.sequence = 0
+
+        if self.debug and self.is_test_mode:
+            print("[Notary] Running in TEST mode - logs will not be notarized")
 
     def log_interaction(
         self,
@@ -110,9 +116,11 @@ class NotaryCore:
             metadata: Event metadata (session_id, slug, etc.)
         """
         # A. Vendor Storage (Customer's S3 Bucket)
-        # Path mirrors AgentSystems ledger: {slug}/{YYYY}/{MM}/{DD}/{hash}.json
+        # Path: {env}/{slug}/{YYYY}/{MM}/{DD}/{hash}.json
+        # where {env} is "prod" or "test" based on API key type
+        env_prefix = "test" if self.is_test_mode else "prod"
         date_path = datetime.now(timezone.utc).strftime('%Y/%m/%d')
-        key = f"{self.slug}/{date_path}/{content_hash}.json"
+        key = f"{env_prefix}/{self.slug}/{date_path}/{content_hash}.json"
 
         try:
             self.s3.put_object(
@@ -129,6 +137,12 @@ class NotaryCore:
             return
 
         # B. Neutral Notary (AgentSystems API)
+        # Skip notarization for test keys - they only write to vendor S3
+        if self.is_test_mode:
+            if self.debug:
+                print("[Notary] Test mode - skipping notarization")
+            return
+
         try:
             with httpx.Client(timeout=5.0) as client:
                 resp = client.post(
