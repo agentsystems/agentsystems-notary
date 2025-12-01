@@ -2,11 +2,12 @@
 
 import hashlib
 import uuid
+from datetime import UTC, datetime
+from typing import Any
+
 import boto3
-import jcs
 import httpx
-from datetime import datetime, timezone
-from typing import Any, Dict
+import jcs
 
 
 class NotaryCore:
@@ -29,7 +30,7 @@ class NotaryCore:
         slug: str,
         vendor_bucket_name: str,
         api_url: str = "https://notary-api.agentsystems.ai/v1/notary",
-        debug: bool = False
+        debug: bool = False,
     ):
         self.api_key = api_key
         self.slug = slug
@@ -52,9 +53,9 @@ class NotaryCore:
 
     def log_interaction(
         self,
-        input_data: Dict[str, Any],
-        output_data: Dict[str, Any],
-        metadata: Dict[str, Any] = None
+        input_data: dict[str, Any],
+        output_data: dict[str, Any],
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """
         Log an LLM interaction with cryptographic verification.
@@ -74,9 +75,9 @@ class NotaryCore:
             "metadata": {
                 "session_id": self.session_id,
                 "sequence": self.sequence,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "slug": self.slug,
-                **(metadata or {})
+                **(metadata or {}),
             },
             "input": input_data,
             "output": output_data,
@@ -100,12 +101,14 @@ class NotaryCore:
 
         # 3. Dual-Write
         try:
-            self._upload_and_notarize(canonical_bytes, content_hash, payload["metadata"])
+            self._upload_and_notarize(
+                canonical_bytes, content_hash, payload["metadata"]
+            )
         except Exception as e:
             print(f"Notary Log Failed: {e}")
 
     def _upload_and_notarize(
-        self, data_bytes: bytes, content_hash: str, metadata: Dict[str, Any]
+        self, data_bytes: bytes, content_hash: str, metadata: dict[str, Any]
     ) -> None:
         """
         Perform dual-write to vendor S3 and Notary API.
@@ -119,7 +122,7 @@ class NotaryCore:
         # Path: {env}/{slug}/{YYYY}/{MM}/{DD}/{hash}.json
         # where {env} is "prod" or "test" based on API key type
         env_prefix = "test" if self.is_test_mode else "prod"
-        date_path = datetime.now(timezone.utc).strftime('%Y/%m/%d')
+        date_path = datetime.now(UTC).strftime("%Y/%m/%d")
         key = f"{env_prefix}/{self.slug}/{date_path}/{content_hash}.json"
 
         try:

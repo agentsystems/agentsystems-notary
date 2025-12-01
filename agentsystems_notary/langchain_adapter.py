@@ -1,7 +1,9 @@
 """LangChain adapter for Notary compliance logging."""
 
-from typing import Any, Dict, List
+from typing import Any
+
 from langchain_core.callbacks import BaseCallbackHandler
+
 from .core import NotaryCore
 
 
@@ -45,7 +47,7 @@ class LangChainNotary(BaseCallbackHandler):
         slug: str,
         vendor_bucket_name: str,
         api_url: str = "https://notary-api.agentsystems.ai/v1/notary",
-        debug: bool = False
+        debug: bool = False,
     ):
         # Initialize framework-agnostic core
         self.core = NotaryCore(
@@ -53,14 +55,14 @@ class LangChainNotary(BaseCallbackHandler):
             slug=slug,
             vendor_bucket_name=vendor_bucket_name,
             api_url=api_url,
-            debug=debug
+            debug=debug,
         )
 
         # Temporary storage for request data
-        self.current_request: Dict[str, Any] = {}
+        self.current_request: dict[str, Any] = {}
 
     def on_llm_start(
-        self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any
+        self, serialized: dict[str, Any], prompts: list[str], **kwargs: Any
     ) -> None:
         """Capture LLM request metadata."""
         self.current_request = {
@@ -77,11 +79,13 @@ class LangChainNotary(BaseCallbackHandler):
         the framework-agnostic core logging method.
         """
         # Extract response text from LangChain's response structure
-        response_text = response.generations[0][0].text if response.generations else ""
+        response_text = (
+            response.generations[0][0].text if response.generations else ""
+        )
 
         # Call framework-agnostic core
         self.core.log_interaction(
             input_data=self.current_request,
             output_data={"text": response_text},
-            metadata={}
+            metadata={},
         )
