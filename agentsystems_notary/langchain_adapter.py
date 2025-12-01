@@ -89,3 +89,4 @@ class LangChainNotary(BaseCallbackHandler):
             output_data={"text": response_text},
             metadata={},
         )
+
