@@ -79,9 +79,10 @@ class LangChainNotary(BaseCallbackHandler):
         the framework-agnostic core logging method.
         """
         # Extract response text from LangChain's response structure
-        response_text = (
-            response.generations[0][0].text if response.generations else ""
-        )
+        if response.generations:
+            response_text = response.generations[0][0].text
+        else:
+            response_text = ""
 
         # Call framework-agnostic core
         self.core.log_interaction(
