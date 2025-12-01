@@ -7,7 +7,7 @@ from langchain_core.callbacks import BaseCallbackHandler
 from .core import NotaryCore
 
 
-class LangChainNotary(BaseCallbackHandler):
+class LangChainNotary(BaseCallbackHandler):  # type: ignore[misc]
     """
     LangChain callback handler for Notary compliance logging.
 
@@ -90,4 +90,3 @@ class LangChainNotary(BaseCallbackHandler):
             output_data={"text": response_text},
             metadata={},
         )
-

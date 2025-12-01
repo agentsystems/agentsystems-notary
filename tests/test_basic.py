@@ -1,6 +1,5 @@
 """Basic tests for agentsystems-notary."""
 
-import pytest
 from agentsystems_notary import LangChainNotary, __version__
 
 
@@ -12,9 +11,7 @@ def test_version():
 def test_langchain_notary_init():
     """Test LangChainNotary initialization."""
     notary = LangChainNotary(
-        api_key="test_key",
-        slug="test_tenant",
-        vendor_bucket_name="test-bucket"
+        api_key="test_key", slug="test_tenant", vendor_bucket_name="test-bucket"
     )
 
     assert notary.core.api_key == "test_key"
@@ -30,7 +27,7 @@ def test_langchain_notary_with_custom_url():
         api_key="test_key",
         slug="test_tenant",
         vendor_bucket_name="test-bucket",
-        api_url="http://localhost:8000/v1/notary"
+        api_url="http://localhost:8000/v1/notary",
     )
 
     assert notary.core.api_url == "http://localhost:8000/v1/notary"
@@ -42,7 +39,7 @@ def test_langchain_notary_debug_mode():
         api_key="test_key",
         slug="test_tenant",
         vendor_bucket_name="test-bucket",
-        debug=True
+        debug=True,
     )
 
     assert notary.core.debug is True
