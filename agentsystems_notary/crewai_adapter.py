@@ -79,7 +79,7 @@ class CrewAINotary:
     def _register_hooks(self) -> None:
         """Register before/after hooks with CrewAI."""
 
-        @before_llm_call  # type: ignore[misc]
+        @before_llm_call  # type: ignore
         def _notary_before_llm(context: Any) -> None:
             """Capture LLM request from CrewAI context."""
             # Extract messages from context
@@ -103,7 +103,7 @@ class CrewAINotary:
 
             return None  # Allow execution
 
-        @after_llm_call  # type: ignore[misc]
+        @after_llm_call  # type: ignore
         def _notary_after_llm(context: Any) -> None:
             """Capture LLM response and log to Notary."""
             if self._current_request is None:
