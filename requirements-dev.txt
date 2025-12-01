@@ -1,0 +1,14 @@
+# Development dependencies
+pre-commit
+pytest>=7.0
+pytest-cov>=4.0
+pip-licenses>=4.0.0
+build
+twine
+black>=23.0
+ruff>=0.1.0
+mypy>=1.5
+
+# Optional framework dependencies for testing
+langchain-core>=0.1.0
+crewai>=0.1.0
