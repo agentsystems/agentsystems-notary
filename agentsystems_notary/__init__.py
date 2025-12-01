@@ -9,8 +9,19 @@ __version__ = (
 # Core (always available)
 from .core import NotaryCore
 
-# Framework adapters (will raise ImportError if dependencies not installed)
-from .langchain_adapter import LangChainNotary
-from .crewai_adapter import CrewAINotary
+__all__ = ["__version__", "NotaryCore"]
 
-__all__ = ["__version__", "NotaryCore", "LangChainNotary", "CrewAINotary"]
+# Framework adapters (optional - only available if dependencies installed)
+try:
+    from .langchain_adapter import LangChainNotary
+
+    __all__.append("LangChainNotary")
+except ImportError:
+    pass
+
+try:
+    from .crewai_adapter import CrewAINotary
+
+    __all__.append("CrewAINotary")
+except ImportError:
+    pass
