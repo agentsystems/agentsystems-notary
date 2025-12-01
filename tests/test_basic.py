@@ -1,6 +1,6 @@
 """Basic tests for agentsystems-notary."""
 
-from agentsystems_notary import LangChainNotary, __version__
+from agentsystems_notary import NotaryCore, __version__
 
 
 def test_version():
@@ -8,38 +8,52 @@ def test_version():
     assert __version__ is not None
 
 
-def test_langchain_notary_init():
-    """Test LangChainNotary initialization."""
-    notary = LangChainNotary(
-        api_key="test_key", slug="test_tenant", vendor_bucket_name="test-bucket"
+def test_notary_core_init():
+    """Test NotaryCore initialization."""
+    core = NotaryCore(
+        api_key="sk_asn_test_key",
+        slug="test_tenant",
+        vendor_bucket_name="test-bucket",
     )
 
-    assert notary.core.api_key == "test_key"
-    assert notary.core.slug == "test_tenant"
-    assert notary.core.bucket_name == "test-bucket"
-    assert notary.core.sequence == 0
-    assert notary.core.session_id is not None
+    assert core.api_key == "sk_asn_test_key"
+    assert core.slug == "test_tenant"
+    assert core.bucket_name == "test-bucket"
+    assert core.sequence == 0
+    assert core.session_id is not None
+    assert core.is_test_mode is True
 
 
-def test_langchain_notary_with_custom_url():
-    """Test LangChainNotary with custom API URL."""
-    notary = LangChainNotary(
-        api_key="test_key",
+def test_notary_core_prod_mode():
+    """Test NotaryCore detects production mode."""
+    core = NotaryCore(
+        api_key="sk_asn_prod_key",
+        slug="test_tenant",
+        vendor_bucket_name="test-bucket",
+    )
+
+    assert core.is_test_mode is False
+
+
+def test_notary_core_with_custom_url():
+    """Test NotaryCore with custom API URL."""
+    core = NotaryCore(
+        api_key="sk_asn_test_key",
         slug="test_tenant",
         vendor_bucket_name="test-bucket",
         api_url="http://localhost:8000/v1/notary",
     )
 
-    assert notary.core.api_url == "http://localhost:8000/v1/notary"
+    assert core.api_url == "http://localhost:8000/v1/notary"
 
 
-def test_langchain_notary_debug_mode():
-    """Test LangChainNotary debug mode."""
-    notary = LangChainNotary(
-        api_key="test_key",
+def test_notary_core_debug_mode():
+    """Test NotaryCore debug mode."""
+    core = NotaryCore(
+        api_key="sk_asn_test_key",
         slug="test_tenant",
         vendor_bucket_name="test-bucket",
         debug=True,
     )
 
-    assert notary.core.debug is True
+    assert core.debug is True
