@@ -1,7 +1,7 @@
 [project]
 name = "agentsystems-notary"
-version = "0.1.0"
-description = "Cryptographic notarization SDK for LLM interactions in regulated industries"
+version = "0.1.1"
+description = "Cryptographic notarization SDK for LLM interactions"
 readme = "README.md"
 authors = [ { name = "AgentSystems", email = "support@agentsystems.ai" } ]
 license = "Apache-2.0"
