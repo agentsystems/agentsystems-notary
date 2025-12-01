@@ -1,4 +1,4 @@
-"""AgentSystems Notary - Audit logging for LLM interactions in regulated industries."""
+"""AgentSystems Notary - Audit logging for LLM interactions."""
 
 from importlib import metadata as _metadata
 
