@@ -2,9 +2,9 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/agentsystems-notary.svg)](https://pypi.org/project/agentsystems-notary/)
 
-> **Audit logging infrastructure for AI systems in regulated industries**
+> **Audit logging infrastructure for AI systems**
 
-AgentSystems Notary provides tamper-evident audit trails for AI systems in banking, legal, healthcare, and other regulated industries. It creates cryptographically verifiable logs of all LLM interactions with dual-write architecture: your S3 bucket (raw logs) + Notary ledger (hash receipts).
+AgentSystems Notary provides tamper-evident audit trails for AI systems. It creates cryptographically verifiable logs of all LLM interactions with dual-write architecture: your S3 bucket (raw logs) + Notary ledger (hash receipts).
 
 ## Features
 
@@ -12,7 +12,7 @@ AgentSystems Notary provides tamper-evident audit trails for AI systems in banki
 - **Dual-Write Architecture**: Vendor S3 (raw logs) + Notary API (hash receipts)
 - **Cryptographic Verification**: SHA-256 hashes with JCS canonicalization (RFC 8785)
 - **Tenant Isolation**: Multi-tenant support for SaaS applications
-- **Compliance Support**: Audit trail architecture aligned with AIUC-1 E015 requirements
+- **Audit Trail Architecture**: Designed with verifiability and auditability in mind
 
 ## Disclaimer
 
