@@ -54,9 +54,6 @@ class NotaryCore:
         self.session_id = str(uuid.uuid4())
         self.sequence = 0
 
-        if self.debug and self.is_test_mode:
-            print("[Notary] Running in TEST mode - logs will not be notarized")
-
     def log_interaction(
         self,
         input_data: dict[str, Any],
@@ -111,7 +108,8 @@ class NotaryCore:
                 canonical_bytes, content_hash, payload["metadata"]
             )
         except Exception as e:
-            print(f"Notary Log Failed: {e}")
+            if self.debug:
+                print(f"[Notary] Log failed: {e}")
 
     def _upload_and_notarize(
         self, data_bytes: bytes, content_hash: str, metadata: dict[str, Any]
@@ -126,7 +124,6 @@ class NotaryCore:
         """
         # A. Neutral Notary (AgentSystems API) - call first to get tenant_id
         # Always call API (handles tenant auto-creation, feed updates)
-        # API will skip ledger write for test keys
         tenant_id: str | None = None
         try:
             with httpx.Client(timeout=5.0) as client:
@@ -149,17 +146,20 @@ class NotaryCore:
                     if self.debug:
                         print(f"[Notary] Verified! Receipt: {receipt[:8]}...")
                 else:
-                    print(f"[Notary] Failed ({resp.status_code}): {resp.text}")
+                    if self.debug:
+                        print(f"[Notary] Failed ({resp.status_code}): {resp.text}")
                     return  # Don't write to S3 if notary failed
         except Exception as e:
-            print(f"[Notary] Connection Error: {e}")
+            if self.debug:
+                print(f"[Notary] Connection error: {e}")
             return  # Don't write to S3 if notary failed
 
         # B. Vendor Storage (Customer's S3 Bucket)
         # Path: {env}/{tenant_id}/{YYYY}/{MM}/{DD}/{hash}.json
         # Uses tenant UUID from API response (globally unique)
         if not tenant_id:
-            print("[Vendor S3] Skipped: missing tenant_id from API")
+            if self.debug:
+                print("[Notary] Skipped S3 write: missing tenant_id from API")
             return
 
         env_prefix = "test" if self.is_test_mode else "prod"
@@ -175,6 +175,7 @@ class NotaryCore:
                 Metadata={"hash": content_hash},
             )
             if self.debug:
-                print(f"[Vendor S3] Saved to {self.bucket_name}/{key}")
+                print(f"[Notary] Saved to S3: {self.bucket_name}/{key}")
         except Exception as e:
-            print(f"[Vendor S3] Failed: {e} (Check your AWS credentials)")
+            if self.debug:
+                print(f"[Notary] S3 write failed: {e}")
