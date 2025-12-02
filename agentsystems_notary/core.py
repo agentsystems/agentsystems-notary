@@ -3,11 +3,17 @@
 import hashlib
 import uuid
 from datetime import UTC, datetime
+from importlib import metadata
 from typing import Any
 
 import boto3
 import httpx
 import jcs
+
+try:
+    __version__ = metadata.version("agentsystems-notary")
+except metadata.PackageNotFoundError:
+    __version__ = "0.0.0"
 
 
 class NotaryCore:
@@ -47,10 +53,6 @@ class NotaryCore:
         # Session tracking
         self.session_id = str(uuid.uuid4())
         self.sequence = 0
-
-        # Cached org/tenant IDs (populated on first API call)
-        self._org_id: str | None = None
-        self._tenant_id: str | None = None
 
         if self.debug and self.is_test_mode:
             print("[Notary] Running in TEST mode - logs will not be notarized")
@@ -122,14 +124,18 @@ class NotaryCore:
             content_hash: SHA256 hash of canonical bytes
             metadata: Event metadata (session_id, slug, etc.)
         """
-        # A. Neutral Notary (AgentSystems API) - call first to get org_id/tenant_id
+        # A. Neutral Notary (AgentSystems API) - call first to get tenant_id
         # Always call API (handles tenant auto-creation, feed updates)
         # API will skip ledger write for test keys
+        tenant_id: str | None = None
         try:
             with httpx.Client(timeout=5.0) as client:
                 resp = client.post(
                     self.api_url,
-                    headers={"X-API-Key": self.api_key},
+                    headers={
+                        "X-API-Key": self.api_key,
+                        "X-SDK-Version": __version__,
+                    },
                     json={
                         "hash": content_hash,
                         "slug": self.slug,
@@ -139,9 +145,7 @@ class NotaryCore:
                 if resp.status_code == 200:
                     result = resp.json()
                     receipt = result["receipt"]
-                    # Cache org/tenant IDs for S3 path
-                    self._org_id = result.get("org_id")
-                    self._tenant_id = result.get("tenant_id")
+                    tenant_id = result.get("tenant_id")
                     if self.debug:
                         print(f"[Notary] Verified! Receipt: {receipt[:8]}...")
                 else:
@@ -152,18 +156,15 @@ class NotaryCore:
             return  # Don't write to S3 if notary failed
 
         # B. Vendor Storage (Customer's S3 Bucket)
-        # Path: {env}/{org_id}/{tenant_id}/{YYYY}/{MM}/{DD}/{hash}.json
-        # Uses UUIDs from API response for guaranteed uniqueness
-        if not self._org_id or not self._tenant_id:
-            print("[Vendor S3] Skipped: missing org_id or tenant_id from API")
+        # Path: {env}/{tenant_id}/{YYYY}/{MM}/{DD}/{hash}.json
+        # Uses tenant UUID from API response (globally unique)
+        if not tenant_id:
+            print("[Vendor S3] Skipped: missing tenant_id from API")
             return
 
         env_prefix = "test" if self.is_test_mode else "prod"
         date_path = datetime.now(UTC).strftime("%Y/%m/%d")
-        key = (
-            f"{env_prefix}/{self._org_id}/{self._tenant_id}"
-            f"/{date_path}/{content_hash}.json"
-        )
+        key = f"{env_prefix}/{tenant_id}/{date_path}/{content_hash}.json"
 
         try:
             self.s3.put_object(
