@@ -48,6 +48,10 @@ class NotaryCore:
         self.session_id = str(uuid.uuid4())
         self.sequence = 0
 
+        # Cached org/tenant IDs (populated on first API call)
+        self._org_id: str | None = None
+        self._tenant_id: str | None = None
+
         if self.debug and self.is_test_mode:
             print("[Notary] Running in TEST mode - logs will not be notarized")
 
@@ -118,28 +122,7 @@ class NotaryCore:
             content_hash: SHA256 hash of canonical bytes
             metadata: Event metadata (session_id, slug, etc.)
         """
-        # A. Vendor Storage (Customer's S3 Bucket)
-        # Path: {env}/{slug}/{YYYY}/{MM}/{DD}/{hash}.json
-        # where {env} is "prod" or "test" based on API key type
-        env_prefix = "test" if self.is_test_mode else "prod"
-        date_path = datetime.now(UTC).strftime("%Y/%m/%d")
-        key = f"{env_prefix}/{self.slug}/{date_path}/{content_hash}.json"
-
-        try:
-            self.s3.put_object(
-                Bucket=self.bucket_name,
-                Key=key,
-                Body=data_bytes,
-                ContentType="application/json",
-                Metadata={"hash": content_hash},
-            )
-            if self.debug:
-                print(f"[Vendor S3] Saved to {self.bucket_name}/{key}")
-        except Exception as e:
-            print(f"[Vendor S3] Failed: {e} (Check your AWS credentials)")
-            return
-
-        # B. Neutral Notary (AgentSystems API)
+        # A. Neutral Notary (AgentSystems API) - call first to get org_id/tenant_id
         # Always call API (handles tenant auto-creation, feed updates)
         # API will skip ledger write for test keys
         try:
@@ -154,10 +137,43 @@ class NotaryCore:
                     },
                 )
                 if resp.status_code == 200:
-                    receipt = resp.json()["receipt"]
+                    result = resp.json()
+                    receipt = result["receipt"]
+                    # Cache org/tenant IDs for S3 path
+                    self._org_id = result.get("org_id")
+                    self._tenant_id = result.get("tenant_id")
                     if self.debug:
                         print(f"[Notary] Verified! Receipt: {receipt[:8]}...")
                 else:
                     print(f"[Notary] Failed ({resp.status_code}): {resp.text}")
+                    return  # Don't write to S3 if notary failed
         except Exception as e:
             print(f"[Notary] Connection Error: {e}")
+            return  # Don't write to S3 if notary failed
+
+        # B. Vendor Storage (Customer's S3 Bucket)
+        # Path: {env}/{org_id}/{tenant_id}/{YYYY}/{MM}/{DD}/{hash}.json
+        # Uses UUIDs from API response for guaranteed uniqueness
+        if not self._org_id or not self._tenant_id:
+            print("[Vendor S3] Skipped: missing org_id or tenant_id from API")
+            return
+
+        env_prefix = "test" if self.is_test_mode else "prod"
+        date_path = datetime.now(UTC).strftime("%Y/%m/%d")
+        key = (
+            f"{env_prefix}/{self._org_id}/{self._tenant_id}"
+            f"/{date_path}/{content_hash}.json"
+        )
+
+        try:
+            self.s3.put_object(
+                Bucket=self.bucket_name,
+                Key=key,
+                Body=data_bytes,
+                ContentType="application/json",
+                Metadata={"hash": content_hash},
+            )
+            if self.debug:
+                print(f"[Vendor S3] Saved to {self.bucket_name}/{key}")
+        except Exception as e:
+            print(f"[Vendor S3] Failed: {e} (Check your AWS credentials)")
