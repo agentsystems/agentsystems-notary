@@ -9,7 +9,7 @@ AgentSystems Notary provides tamper-evident audit trails for AI systems. It crea
 ## Features
 
 - **Multi-Framework Support**: LangChain and CrewAI adapters (extensible to other frameworks)
-- **Dual-Write Architecture**: Vendor S3 (raw logs) + Notary API (hash receipts)
+- **Dual-Write Architecture**: Organization S3 (raw logs) + Notary API (hash receipts)
 - **Cryptographic Verification**: SHA-256 hashes with JCS canonicalization (RFC 8785)
 - **Tenant Isolation**: Multi-tenant support for SaaS applications
 - **Audit Trail Architecture**: Designed with verifiability and auditability in mind
@@ -43,7 +43,7 @@ from langchain_anthropic import ChatAnthropic
 notary = LangChainNotary(
     api_key="sk_asn_prod_...",        # From notary.agentsystems.ai
     slug="tnt_acme_corp",             # Your tenant slug
-    vendor_bucket_name="acme-llm-logs"  # Your S3 bucket
+    org_bucket_name="acme-llm-logs"   # Your S3 bucket
 )
 
 # 2. Add to any LangChain model
@@ -66,7 +66,7 @@ from crewai import Agent, Task, Crew
 notary = CrewAINotary(
     api_key="sk_asn_prod_...",
     slug="tnt_acme_corp",
-    vendor_bucket_name="acme-llm-logs"
+    org_bucket_name="acme-llm-logs"
 )
 
 # 2. Create crew normally
@@ -92,7 +92,7 @@ crew.kickoff()
 ### Environment Variables
 
 ```bash
-# AWS credentials (for vendor S3 bucket)
+# AWS credentials (for organization S3 bucket)
 export AWS_ACCESS_KEY_ID=...
 export AWS_SECRET_ACCESS_KEY=...
 export AWS_DEFAULT_REGION=us-east-1
@@ -104,7 +104,7 @@ export AWS_DEFAULT_REGION=us-east-1
 notary = LangChainNotary(
     api_key="sk_asn_prod_...",
     slug="tnt_acme_corp",
-    vendor_bucket_name="acme-llm-logs",
+    org_bucket_name="acme-llm-logs",
     debug=True  # Prints canonical JSON and hashes
 )
 ```
@@ -118,13 +118,13 @@ For SaaS applications serving multiple end-customers:
 notary_bank_a = LangChainNotary(
     api_key="sk_asn_prod_...",
     slug="tnt_bank_a",              # Bank A's logs
-    vendor_bucket_name="your-logs"
+    org_bucket_name="your-logs"
 )
 
 notary_bank_b = LangChainNotary(
     api_key="sk_asn_prod_...",
     slug="tnt_bank_b",              # Bank B's logs (isolated)
-    vendor_bucket_name="your-logs"
+    org_bucket_name="your-logs"
 )
 ```
 
@@ -134,7 +134,7 @@ Generate API keys at [notary.agentsystems.ai](https://notary.agentsystems.ai).
 
 ## S3 Bucket Structure
 
-Vendor bucket (your S3):
+Organization bucket (your S3):
 ```
 logs/
   {slug}/

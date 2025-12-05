@@ -25,7 +25,7 @@ class NotaryCore:
     Args:
         api_key: Notary API key (from notary.agentsystems.ai)
         slug: Tenant slug (e.g., "tnt_acme_corp")
-        vendor_bucket_name: S3 bucket name for raw logs
+        org_bucket_name: S3 bucket name for raw logs (organization's custody)
         api_url: Notary API endpoint (default: production)
         debug: Enable debug output (default: False)
     """
@@ -34,13 +34,13 @@ class NotaryCore:
         self,
         api_key: str,
         slug: str,
-        vendor_bucket_name: str,
+        org_bucket_name: str,
         api_url: str = "https://notary-api.agentsystems.ai/v1/notary",
         debug: bool = False,
     ):
         self.api_key = api_key
         self.slug = slug
-        self.bucket_name = vendor_bucket_name
+        self.bucket_name = org_bucket_name
         self.api_url = api_url
         self.debug = debug
 
@@ -115,7 +115,7 @@ class NotaryCore:
         self, data_bytes: bytes, content_hash: str, metadata: dict[str, Any]
     ) -> None:
         """
-        Perform dual-write to vendor S3 and Notary API.
+        Perform dual-write to organization S3 and Notary API.
 
         Args:
             data_bytes: Canonical JSON bytes to store in S3
@@ -154,7 +154,7 @@ class NotaryCore:
                 print(f"[Notary] Connection error: {e}")
             return  # Don't write to S3 if notary failed
 
-        # B. Vendor Storage (Customer's S3 Bucket)
+        # B. Organization Storage (Customer's S3 Bucket)
         # Path: {env}/{tenant_id}/{YYYY}/{MM}/{DD}/{hash}.json
         # Uses tenant UUID from API response (globally unique)
         if not tenant_id:

@@ -22,7 +22,7 @@ class CrewAINotary:
     Args:
         api_key: Notary API key (from notary.agentsystems.ai)
         slug: Tenant slug (e.g., "tnt_acme_corp")
-        vendor_bucket_name: S3 bucket name for raw logs
+        org_bucket_name: S3 bucket name for raw logs (organization's custody)
         api_url: Notary API endpoint (default: production)
         debug: Enable debug output (default: False)
 
@@ -35,7 +35,7 @@ class CrewAINotary:
         notary = CrewAINotary(
             api_key="sk_asn_prod_...",
             slug="tnt_acme_corp",
-            vendor_bucket_name="acme-llm-logs"
+            org_bucket_name="acme-llm-logs"
         )
 
         # Create crew - hooks are automatically registered
@@ -52,7 +52,7 @@ class CrewAINotary:
         self,
         api_key: str,
         slug: str,
-        vendor_bucket_name: str,
+        org_bucket_name: str,
         api_url: str = "https://notary-api.agentsystems.ai/v1/notary",
         debug: bool = False,
     ):
@@ -65,7 +65,7 @@ class CrewAINotary:
         self.core = NotaryCore(
             api_key=api_key,
             slug=slug,
-            vendor_bucket_name=vendor_bucket_name,
+            org_bucket_name=org_bucket_name,
             api_url=api_url,
             debug=debug,
         )

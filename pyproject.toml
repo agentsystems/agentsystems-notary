@@ -1,6 +1,6 @@
 [project]
 name = "agentsystems-notary"
-version = "0.1.5"
+version = "0.1.6"
 description = "Cryptographic notarization SDK for LLM interactions"
 readme = "README.md"
 authors = [ { name = "AgentSystems", email = "support@agentsystems.ai" } ]
