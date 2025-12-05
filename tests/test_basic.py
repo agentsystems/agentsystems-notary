@@ -13,7 +13,7 @@ def test_notary_core_init():
     core = NotaryCore(
         api_key="sk_asn_test_key",
         slug="test_tenant",
-        vendor_bucket_name="test-bucket",
+        org_bucket_name="test-bucket",
     )
 
     assert core.api_key == "sk_asn_test_key"
@@ -29,7 +29,7 @@ def test_notary_core_prod_mode():
     core = NotaryCore(
         api_key="sk_asn_prod_key",
         slug="test_tenant",
-        vendor_bucket_name="test-bucket",
+        org_bucket_name="test-bucket",
     )
 
     assert core.is_test_mode is False
@@ -40,7 +40,7 @@ def test_notary_core_with_custom_url():
     core = NotaryCore(
         api_key="sk_asn_test_key",
         slug="test_tenant",
-        vendor_bucket_name="test-bucket",
+        org_bucket_name="test-bucket",
         api_url="http://localhost:8000/v1/notary",
     )
 
@@ -52,7 +52,7 @@ def test_notary_core_debug_mode():
     core = NotaryCore(
         api_key="sk_asn_test_key",
         slug="test_tenant",
-        vendor_bucket_name="test-bucket",
+        org_bucket_name="test-bucket",
         debug=True,
     )
 
