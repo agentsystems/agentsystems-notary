@@ -104,23 +104,18 @@ class NotaryCore:
 
         # 3. Dual-Write
         try:
-            self._upload_and_notarize(
-                canonical_bytes, content_hash, payload["metadata"]
-            )
+            self._upload_and_notarize(canonical_bytes, content_hash)
         except Exception as e:
             if self.debug:
                 print(f"[Notary] Log failed: {e}")
 
-    def _upload_and_notarize(
-        self, data_bytes: bytes, content_hash: str, metadata: dict[str, Any]
-    ) -> None:
+    def _upload_and_notarize(self, data_bytes: bytes, content_hash: str) -> None:
         """
         Perform dual-write to organization S3 and Notary API.
 
         Args:
             data_bytes: Canonical JSON bytes to store in S3
             content_hash: SHA256 hash of canonical bytes
-            metadata: Event metadata (session_id, slug, etc.)
         """
         # A. Neutral Notary (AgentSystems API) - call first to get tenant_id
         # Always call API (handles tenant auto-creation, feed updates)
@@ -136,7 +131,6 @@ class NotaryCore:
                     json={
                         "hash": content_hash,
                         "slug": self.slug,
-                        "metadata": metadata,
                     },
                 )
                 if resp.status_code == 200:
