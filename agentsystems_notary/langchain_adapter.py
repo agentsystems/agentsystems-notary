@@ -9,7 +9,7 @@ from .core import NotaryCore
 
 class LangChainNotary(BaseCallbackHandler):  # type: ignore[misc]
     """
-    LangChain callback handler for Notary compliance logging.
+    LangChain callback handler for Notary logging.
 
     This is a thin adapter that extracts data from LangChain's callback
     interface and passes it to the framework-agnostic NotaryCore.
