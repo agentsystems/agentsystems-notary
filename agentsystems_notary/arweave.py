@@ -6,7 +6,7 @@ import struct
 from importlib import metadata
 
 import boto3
-import requests  # type: ignore[import-untyped]
+import requests
 from cryptography.hazmat.primitives.serialization import load_der_public_key
 
 from .config import ArweaveHashStorage
@@ -112,7 +112,7 @@ class ArweaveBackend:
             # Parse DER-encoded public key to extract RSA modulus
             der_bytes = response["PublicKey"]
             pub = load_der_public_key(der_bytes)
-            n = pub.public_numbers().n
+            n = pub.public_numbers().n  # type: ignore[union-attr]
 
             # Convert modulus to bytes (512 bytes for RSA-4096)
             n_bytes = n.to_bytes((n.bit_length() + 7) // 8, "big")
