@@ -2,7 +2,9 @@
 
 import base64
 import hashlib
+import json
 import struct
+from datetime import UTC, datetime
 from importlib import metadata
 
 import boto3
@@ -241,15 +243,24 @@ class ArweaveBackend:
         Returns:
             Transaction ID (base64url encoded)
         """
-        # Data = just the hash (64 bytes hex string)
-        data = content_hash.encode("utf-8")
+        notarized_at = datetime.now(UTC).isoformat()
+
+        # Build receipt JSON
+        receipt = {
+            "hash": content_hash,
+            "namespace": self.storage.namespace,
+            "notarized_at": notarized_at,
+            "sdk_version": __version__,
+            "v": "1",
+        }
+        data = json.dumps(receipt).encode("utf-8")
 
         # Tags for discoverability
         tags = [
             ("App-Name", "agentsystems-notary"),
-            ("Content-Type", "text/plain"),
+            ("Content-Type", "application/json"),
             ("Namespace", self.storage.namespace),
-            ("Content-Hash", content_hash),
+            ("Hash", content_hash),
             ("Session-ID", session_id),
             ("Sequence", str(sequence)),
             ("SDK-Version", __version__),
