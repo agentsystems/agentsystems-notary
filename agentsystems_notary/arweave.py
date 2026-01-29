@@ -243,7 +243,9 @@ class ArweaveBackend:
         Returns:
             Transaction ID (base64url encoded)
         """
-        notarized_at = datetime.now(UTC).isoformat()
+        now = datetime.now(UTC)
+        notarized_at = now.isoformat()
+        notarized_date_utc = now.strftime("%Y-%m-%d")
 
         # Build receipt JSON
         receipt = {
@@ -263,6 +265,8 @@ class ArweaveBackend:
             ("Hash", content_hash),
             ("Session-ID", session_id),
             ("Sequence", str(sequence)),
+            ("Notarized-At", notarized_at),
+            ("Notarized-Date-UTC", notarized_date_utc),
             ("SDK-Version", __version__),
         ]
 
