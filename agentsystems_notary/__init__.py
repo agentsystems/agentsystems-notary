@@ -2,13 +2,22 @@
 
 from importlib import metadata as _metadata
 
-from .core import NotaryCore
+from .config import ArweaveHashStorage, NotaryHashStorage, PayloadStorageConfig
+from .core import LogResult, NotaryCore, PayloadTooLargeError
 
 __version__ = (
     _metadata.version(__name__.replace("_", "-")) if __name__ != "__main__" else "0.0.0"
 )
 
-__all__ = ["__version__", "NotaryCore"]
+__all__ = [
+    "__version__",
+    "NotaryCore",
+    "PayloadStorageConfig",
+    "NotaryHashStorage",
+    "ArweaveHashStorage",
+    "LogResult",
+    "PayloadTooLargeError",
+]
 
 # Framework adapters (optional - only available if dependencies installed)
 try:
