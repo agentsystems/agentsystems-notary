@@ -2,7 +2,8 @@
 
 from typing import Any
 
-from .core import NotaryCore
+from .config import PayloadStorageConfig
+from .core import HashStorage, NotaryCore
 
 try:
     from crewai.hooks import after_llm_call, before_llm_call
@@ -20,22 +21,34 @@ class CrewAINotary:
     and passes it to the framework-agnostic NotaryCore.
 
     Args:
-        api_key: Notary API key (from notary.agentsystems.ai)
-        slug: Tenant slug (e.g., "tnt_acme_corp")
-        org_bucket_name: S3 bucket name for raw logs (organization's custody)
-        api_url: Notary API endpoint (default: production)
+        payload_storage: Configuration for vendor's S3 bucket (full audit logs)
+        hash_storage: List of hash storage configurations (Notary API and/or Arweave)
         debug: Enable debug output (default: False)
 
     Example:
         ```python
-        from agentsystems_notary import CrewAINotary
+        from agentsystems_notary import (
+            CrewAINotary,
+            PayloadStorageConfig,
+            NotaryHashStorage,
+        )
         from crewai import Agent, Task, Crew
+
+        payload_storage = PayloadStorageConfig(
+            bucket_name="acme-corp-audit-logs",
+            aws_access_key_id="...",
+            aws_secret_access_key="...",
+        )
 
         # Initialize notary logging
         notary = CrewAINotary(
-            api_key="sk_asn_prod_...",
-            slug="tnt_acme_corp",
-            org_bucket_name="acme-llm-logs"
+            payload_storage=payload_storage,
+            hash_storage=[
+                NotaryHashStorage(
+                    api_key="sk_asn_prod_...",
+                    slug="tnt_acme_corp",
+                ),
+            ],
         )
 
         # Create crew - hooks are automatically registered
@@ -50,10 +63,8 @@ class CrewAINotary:
 
     def __init__(
         self,
-        api_key: str,
-        slug: str,
-        org_bucket_name: str,
-        api_url: str = "https://notary-api.agentsystems.ai/v1/notary",
+        payload_storage: PayloadStorageConfig,
+        hash_storage: list[HashStorage],
         debug: bool = False,
     ):
         if not CREWAI_AVAILABLE:
@@ -63,10 +74,8 @@ class CrewAINotary:
 
         # Initialize framework-agnostic core
         self.core = NotaryCore(
-            api_key=api_key,
-            slug=slug,
-            org_bucket_name=org_bucket_name,
-            api_url=api_url,
+            payload_storage=payload_storage,
+            hash_storage=hash_storage,
             debug=debug,
         )
 

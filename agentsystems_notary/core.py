@@ -2,6 +2,7 @@
 
 import hashlib
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib import metadata
 from typing import Any
@@ -10,45 +11,116 @@ import boto3
 import httpx
 import jcs
 
+from .arweave import ArweaveBackend
+from .config import ArweaveHashStorage, NotaryHashStorage, PayloadStorageConfig
+
 try:
     __version__ = metadata.version("agentsystems-notary")
 except metadata.PackageNotFoundError:
     __version__ = "0.0.0"
 
 
+# Maximum payload size for Arweave hash storage (10KB)
+MAX_PAYLOAD_SIZE = 10 * 1024
+
+
+class PayloadTooLargeError(Exception):
+    """Raised when payload exceeds maximum size limit for Arweave hash storage."""
+
+    pass
+
+
+@dataclass
+class LogResult:
+    """Result from logging an interaction."""
+
+    content_hash: str
+    notary_receipt: str | None = None
+    arweave_tx_id: str | None = None
+
+
+# Type alias for hash storage options
+HashStorage = NotaryHashStorage | ArweaveHashStorage
+
+
 class NotaryCore:
     """
     Framework-agnostic notary logging core.
 
-    Handles canonicalization, hashing, and dual-write for any AI framework.
+    Handles canonicalization, hashing, and storage for any AI framework.
 
     Args:
-        api_key: Notary API key (from notary.agentsystems.ai)
-        slug: Tenant slug (e.g., "tnt_acme_corp")
-        org_bucket_name: S3 bucket name for raw logs (organization's custody)
-        api_url: Notary API endpoint (default: production)
+        payload_storage: Configuration for vendor's S3 bucket (full audit logs)
+        hash_storage: List of hash storage configurations (Notary API and/or Arweave)
         debug: Enable debug output (default: False)
+
+    Example:
+        ```python
+        from agentsystems_notary import (
+            NotaryCore,
+            PayloadStorageConfig,
+            NotaryHashStorage,
+        )
+
+        payload_storage = PayloadStorageConfig(
+            bucket_name="my-audit-logs",
+            aws_access_key_id="...",
+            aws_secret_access_key="...",
+        )
+
+        core = NotaryCore(
+            payload_storage=payload_storage,
+            hash_storage=[
+                NotaryHashStorage(api_key="sk_asn_prod_...", slug="my_tenant"),
+            ],
+        )
+
+        result = core.log_interaction(
+            input_data={"prompt": "Hello"},
+            output_data={"response": "Hi there!"},
+        )
+        print(f"Hash: {result.content_hash}")
+        ```
     """
 
     def __init__(
         self,
-        api_key: str,
-        slug: str,
-        org_bucket_name: str,
-        api_url: str = "https://notary-api.agentsystems.ai/v1/notary",
+        payload_storage: PayloadStorageConfig,
+        hash_storage: list[HashStorage],
         debug: bool = False,
     ):
-        self.api_key = api_key
-        self.slug = slug
-        self.bucket_name = org_bucket_name
-        self.api_url = api_url
+        if not hash_storage:
+            raise ValueError("At least one hash_storage must be provided")
+
+        self.payload_storage = payload_storage
+        self.hash_storage = hash_storage
         self.debug = debug
 
-        # Detect environment from API key prefix
-        self.is_test_mode = api_key.startswith("sk_asn_test_")
+        # Separate hash storage by type
+        self._notary_storages = [
+            h for h in hash_storage if isinstance(h, NotaryHashStorage)
+        ]
+        self._arweave_storages = [
+            h for h in hash_storage if isinstance(h, ArweaveHashStorage)
+        ]
 
-        # Initialize S3 client (uses AWS credentials from environment)
-        self.s3 = boto3.client("s3")
+        # Detect test mode from any Notary storage
+        self.is_test_mode = any(
+            h.api_key.startswith("sk_asn_test_") for h in self._notary_storages
+        )
+
+        # Initialize Arweave backends
+        self._arweave_backends = [
+            ArweaveBackend(storage, debug) for storage in self._arweave_storages
+        ]
+
+        # S3 client with explicit credentials
+        self.s3 = boto3.client(
+            "s3",
+            aws_access_key_id=payload_storage.aws_access_key_id,
+            aws_secret_access_key=payload_storage.aws_secret_access_key,
+            region_name=payload_storage.aws_region,
+        )
 
         # Session tracking
         self.session_id = str(uuid.uuid4())
@@ -59,27 +131,35 @@ class NotaryCore:
         input_data: dict[str, Any],
         output_data: dict[str, Any],
         metadata: dict[str, Any] | None = None,
-    ) -> None:
+    ) -> LogResult:
         """
         Log an LLM interaction with cryptographic verification.
 
         This is the main entry point called by framework adapters.
-        Performs: canonicalization -> hashing -> dual-write
+        Performs: canonicalization -> hashing -> storage
 
         Args:
             input_data: Framework-specific input (prompts, messages, etc.)
             output_data: Framework-specific output (response text, etc.)
             metadata: Additional metadata to include
+
+        Returns:
+            LogResult with content hash and receipts/transaction IDs
+
+        Raises:
+            PayloadTooLargeError: If payload exceeds 10KB and Arweave is configured
+            Exception: If any hash storage fails (strict mode)
         """
         self.sequence += 1
 
-        # Build payload
+        # Build payload (include slug from first NotaryHashStorage if present)
+        first_notary = self._notary_storages[0] if self._notary_storages else None
         payload = {
             "metadata": {
                 "session_id": self.session_id,
                 "sequence": self.sequence,
                 "timestamp": datetime.now(UTC).isoformat(),
-                "slug": self.slug,
+                "slug": first_notary.slug if first_notary else None,
                 **(metadata or {}),
             },
             "input": input_data,
@@ -95,6 +175,13 @@ class NotaryCore:
             print(canonical_bytes.decode("utf-8"))
             print("=" * 80)
 
+        # Check size limit (only if Arweave storage is configured)
+        if self._arweave_storages and len(canonical_bytes) > MAX_PAYLOAD_SIZE:
+            raise PayloadTooLargeError(
+                f"Payload size ({len(canonical_bytes)} bytes) exceeds "
+                f"maximum ({MAX_PAYLOAD_SIZE} bytes) for Arweave hash storage"
+            )
+
         # 2. Hash
         content_hash = hashlib.sha256(canonical_bytes).hexdigest()
 
@@ -102,74 +189,107 @@ class NotaryCore:
             print(f"HASH: {content_hash}")
             print("=" * 80 + "\n")
 
-        # 3. Dual-Write
-        try:
-            self._upload_and_notarize(canonical_bytes, content_hash)
-        except Exception as e:
-            if self.debug:
-                print(f"[Notary] Log failed: {e}")
+        # Initialize result
+        result = LogResult(content_hash=content_hash)
 
-    def _upload_and_notarize(self, data_bytes: bytes, content_hash: str) -> None:
+        # 3. Write to hash storages (strict mode - any failure raises)
+        s3_written = False
+
+        for notary_storage in self._notary_storages:
+            receipt, tenant_id = self._upload_to_notary(notary_storage, content_hash)
+            result.notary_receipt = receipt  # Last one wins if multiple
+            if not s3_written:
+                # Write full payload to S3 using tenant_id from API
+                env = (
+                    "test"
+                    if notary_storage.api_key.startswith("sk_asn_test_")
+                    else "prod"
+                )
+                self._write_to_s3(canonical_bytes, content_hash, tenant_id, env)
+                s3_written = True
+
+        for i, arweave_backend in enumerate(self._arweave_backends):
+            tx_id = arweave_backend.upload_hash(
+                content_hash, self.session_id, self.sequence
+            )
+            result.arweave_tx_id = tx_id  # Last one wins if multiple
+            if not s3_written:
+                # Write to S3 using namespace from Arweave storage
+                namespace = self._arweave_storages[i].namespace
+                self._write_to_s3(canonical_bytes, content_hash, namespace, "arweave")
+                s3_written = True
+
+        return result
+
+    def _upload_to_notary(
+        self,
+        storage: NotaryHashStorage,
+        content_hash: str,
+    ) -> tuple[str, str]:
         """
-        Perform dual-write to organization S3 and Notary API.
+        Upload hash to Notary API.
 
         Args:
-            data_bytes: Canonical JSON bytes to store in S3
-            content_hash: SHA256 hash of canonical bytes
+            storage: NotaryHashStorage configuration
+            content_hash: SHA-256 hash of canonical payload
+
+        Returns:
+            Tuple of (receipt, tenant_id)
+
+        Raises:
+            httpx.HTTPStatusError: If API request fails
+            ValueError: If response missing tenant_id
         """
-        # A. Neutral Notary (AgentSystems API) - call first to get tenant_id
-        # Always call API (handles tenant auto-creation, feed updates)
-        tenant_id: str | None = None
-        try:
-            with httpx.Client(timeout=5.0) as client:
-                resp = client.post(
-                    self.api_url,
-                    headers={
-                        "X-API-Key": self.api_key,
-                        "X-SDK-Version": __version__,
-                    },
-                    json={
-                        "hash": content_hash,
-                        "slug": self.slug,
-                    },
-                )
-                if resp.status_code == 200:
-                    result = resp.json()
-                    receipt = result["receipt"]
-                    tenant_id = result.get("tenant_id")
-                    if self.debug:
-                        print(f"[Notary] Verified! Receipt: {receipt[:8]}...")
-                else:
-                    if self.debug:
-                        print(f"[Notary] Failed ({resp.status_code}): {resp.text}")
-                    return  # Don't write to S3 if notary failed
-        except Exception as e:
-            if self.debug:
-                print(f"[Notary] Connection error: {e}")
-            return  # Don't write to S3 if notary failed
-
-        # B. Organization Storage (Customer's S3 Bucket)
-        # Path: {env}/{tenant_id}/{YYYY}/{MM}/{DD}/{hash}.json
-        # Uses tenant UUID from API response (globally unique)
-        if not tenant_id:
-            if self.debug:
-                print("[Notary] Skipped S3 write: missing tenant_id from API")
-            return
-
-        env_prefix = "test" if self.is_test_mode else "prod"
-        date_path = datetime.now(UTC).strftime("%Y/%m/%d")
-        key = f"{env_prefix}/{tenant_id}/{date_path}/{content_hash}.json"
-
-        try:
-            self.s3.put_object(
-                Bucket=self.bucket_name,
-                Key=key,
-                Body=data_bytes,
-                ContentType="application/json",
-                Metadata={"hash": content_hash},
+        with httpx.Client(timeout=5.0) as client:
+            resp = client.post(
+                storage.api_url,
+                headers={
+                    "X-API-Key": storage.api_key,
+                    "X-SDK-Version": __version__,
+                },
+                json={"hash": content_hash, "slug": storage.slug},
             )
-            if self.debug:
-                print(f"[Notary] Saved to S3: {self.bucket_name}/{key}")
-        except Exception as e:
-            if self.debug:
-                print(f"[Notary] S3 write failed: {e}")
+            resp.raise_for_status()
+            result = resp.json()
+            receipt = result["receipt"]
+            tenant_id = result.get("tenant_id")
+
+        if not tenant_id:
+            raise ValueError("Missing tenant_id from Notary API response")
+
+        if self.debug:
+            print(f"[Notary] Receipt: {receipt[:8]}...")
+
+        return receipt, tenant_id
+
+    def _write_to_s3(
+        self,
+        data_bytes: bytes,
+        content_hash: str,
+        path_prefix: str,
+        env_prefix: str,
+    ) -> None:
+        """
+        Write full payload to vendor's S3 bucket.
+
+        Path: {env_prefix}/{path_prefix}/{YYYY}/{MM}/{DD}/{hash}.json
+
+        Args:
+            data_bytes: Canonical JSON bytes
+            content_hash: SHA-256 hash (used in filename)
+            path_prefix: tenant_id (Notary) or namespace (Arweave)
+            env_prefix: "test", "prod", or "arweave"
+        """
+        date_path = datetime.now(UTC).strftime("%Y/%m/%d")
+        key = f"{env_prefix}/{path_prefix}/{date_path}/{content_hash}.json"
+
+        self.s3.put_object(
+            Bucket=self.payload_storage.bucket_name,
+            Key=key,
+            Body=data_bytes,
+            ContentType="application/json",
+            Metadata={"hash": content_hash},
+        )
+
+        if self.debug:
+            print(f"[S3] Saved: {self.payload_storage.bucket_name}/{key}")

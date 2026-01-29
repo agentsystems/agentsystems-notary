@@ -5,7 +5,8 @@ from uuid import UUID
 
 from langchain_core.callbacks import BaseCallbackHandler
 
-from .core import NotaryCore
+from .config import PayloadStorageConfig
+from .core import HashStorage, NotaryCore
 
 
 class LangChainNotary(BaseCallbackHandler):  # type: ignore[misc]
@@ -16,21 +17,33 @@ class LangChainNotary(BaseCallbackHandler):  # type: ignore[misc]
     interface and passes it to the framework-agnostic NotaryCore.
 
     Args:
-        api_key: Notary API key (from notary.agentsystems.ai)
-        slug: Tenant slug (e.g., "tnt_acme_corp")
-        org_bucket_name: S3 bucket name for raw logs (organization's custody)
-        api_url: Notary API endpoint (default: production)
+        payload_storage: Configuration for vendor's S3 bucket (full audit logs)
+        hash_storage: List of hash storage configurations (Notary API and/or Arweave)
         debug: Enable debug output (default: False)
 
     Example:
         ```python
-        from agentsystems_notary import LangChainNotary
+        from agentsystems_notary import (
+            LangChainNotary,
+            PayloadStorageConfig,
+            NotaryHashStorage,
+        )
         from langchain_anthropic import ChatAnthropic
 
+        payload_storage = PayloadStorageConfig(
+            bucket_name="acme-corp-audit-logs",
+            aws_access_key_id="...",
+            aws_secret_access_key="...",
+        )
+
         callback = LangChainNotary(
-            api_key="sk_asn_prod_...",
-            slug="tnt_acme_corp",
-            org_bucket_name="acme-llm-logs"
+            payload_storage=payload_storage,
+            hash_storage=[
+                NotaryHashStorage(
+                    api_key="sk_asn_prod_...",
+                    slug="tnt_acme_corp",
+                ),
+            ],
         )
 
         model = ChatAnthropic(
@@ -44,18 +57,14 @@ class LangChainNotary(BaseCallbackHandler):  # type: ignore[misc]
 
     def __init__(
         self,
-        api_key: str,
-        slug: str,
-        org_bucket_name: str,
-        api_url: str = "https://notary-api.agentsystems.ai/v1/notary",
+        payload_storage: PayloadStorageConfig,
+        hash_storage: list[HashStorage],
         debug: bool = False,
     ):
         # Initialize framework-agnostic core
         self.core = NotaryCore(
-            api_key=api_key,
-            slug=slug,
-            org_bucket_name=org_bucket_name,
-            api_url=api_url,
+            payload_storage=payload_storage,
+            hash_storage=hash_storage,
             debug=debug,
         )
 
