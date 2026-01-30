@@ -4,9 +4,9 @@ from dataclasses import dataclass
 
 
 @dataclass
-class PayloadStorageConfig:
+class RawPayloadStorage:
     """
-    Configuration for payload storage (vendor's S3 bucket for full audit logs).
+    Configuration for raw payload storage (vendor's S3 bucket for full audit logs).
 
     The vendor's S3 bucket receives the full JSON payload of every LLM interaction.
     This is where the raw audit logs are stored for verification.
@@ -25,17 +25,17 @@ class PayloadStorageConfig:
 
 
 @dataclass
-class NotaryHashStorage:
+class CustodiedHashStorage:
     """
-    Configuration for AgentSystems Notary API hash storage.
+    Configuration for AgentSystems custodied hash storage (centralized).
 
-    Hashes are sent to the AgentSystems Notary API for tamper-evident storage.
+    Hashes are sent to the AgentSystems API for tamper-evident storage.
     The API returns a receipt and tenant_id for verification.
 
     Args:
-        api_key: AgentSystems Notary API key (sk_asn_test_* or sk_asn_prod_*)
+        api_key: AgentSystems API key (sk_asn_test_* or sk_asn_prod_*)
         slug: Tenant slug (human-readable identifier, e.g., "tnt_acme_corp")
-        api_url: Notary API endpoint (default: production)
+        api_url: API endpoint (default: production)
     """
 
     api_key: str
