@@ -193,31 +193,24 @@ class NotaryCore:
         result = LogResult(content_hash=content_hash)
 
         # 3. Write to hash storages (strict mode - any failure raises)
-        s3_written = False
-
+        # Each hash storage gets its own S3 path for clear separation
         for notary_storage in self._notary_storages:
             receipt, tenant_id = self._upload_to_notary(notary_storage, content_hash)
             result.notary_receipt = receipt  # Last one wins if multiple
-            if not s3_written:
-                # Write full payload to S3 using tenant_id from API
-                env = (
-                    "test"
-                    if notary_storage.api_key.startswith("sk_asn_test_")
-                    else "prod"
-                )
-                self._write_to_s3(canonical_bytes, content_hash, tenant_id, env)
-                s3_written = True
+            # Write full payload to S3 using tenant_id from API
+            env = (
+                "test" if notary_storage.api_key.startswith("sk_asn_test_") else "prod"
+            )
+            self._write_to_s3(canonical_bytes, content_hash, tenant_id, env)
 
         for i, arweave_backend in enumerate(self._arweave_backends):
             tx_id = arweave_backend.upload_hash(
                 content_hash, self.session_id, self.sequence
             )
             result.arweave_tx_id = tx_id  # Last one wins if multiple
-            if not s3_written:
-                # Write to S3 using namespace from Arweave storage
-                namespace = self._arweave_storages[i].namespace
-                self._write_to_s3(canonical_bytes, content_hash, namespace, "arweave")
-                s3_written = True
+            # Write to S3 using namespace from Arweave storage
+            namespace = self._arweave_storages[i].namespace
+            self._write_to_s3(canonical_bytes, content_hash, namespace, "arweave")
 
         return result
 
