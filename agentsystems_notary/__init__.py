@@ -2,7 +2,7 @@
 
 from importlib import metadata as _metadata
 
-from .config import ArweaveHashStorage, NotaryHashStorage, PayloadStorageConfig
+from .config import ArweaveHashStorage, CustodiedHashStorage, RawPayloadStorage
 from .core import LogResult, NotaryCore, PayloadTooLargeError
 
 __version__ = (
@@ -12,8 +12,8 @@ __version__ = (
 __all__ = [
     "__version__",
     "NotaryCore",
-    "PayloadStorageConfig",
-    "NotaryHashStorage",
+    "RawPayloadStorage",
+    "CustodiedHashStorage",
     "ArweaveHashStorage",
     "LogResult",
     "PayloadTooLargeError",

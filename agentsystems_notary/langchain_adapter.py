@@ -5,7 +5,7 @@ from uuid import UUID
 
 from langchain_core.callbacks import BaseCallbackHandler
 
-from .config import PayloadStorageConfig
+from .config import RawPayloadStorage
 from .core import HashStorage, NotaryCore
 
 
@@ -17,29 +17,29 @@ class LangChainNotary(BaseCallbackHandler):  # type: ignore[misc]
     interface and passes it to the framework-agnostic NotaryCore.
 
     Args:
-        payload_storage: Configuration for vendor's S3 bucket (full audit logs)
-        hash_storage: List of hash storage configurations (Notary API and/or Arweave)
+        raw_payload_storage: Configuration for vendor's S3 bucket (full audit logs)
+        hash_storage: List of hash storage configurations (custodied and/or Arweave)
         debug: Enable debug output (default: False)
 
     Example:
         ```python
         from agentsystems_notary import (
             LangChainNotary,
-            PayloadStorageConfig,
-            NotaryHashStorage,
+            RawPayloadStorage,
+            CustodiedHashStorage,
         )
         from langchain_anthropic import ChatAnthropic
 
-        payload_storage = PayloadStorageConfig(
+        raw_payload_storage = RawPayloadStorage(
             bucket_name="acme-corp-audit-logs",
             aws_access_key_id="...",
             aws_secret_access_key="...",
         )
 
         callback = LangChainNotary(
-            payload_storage=payload_storage,
+            raw_payload_storage=raw_payload_storage,
             hash_storage=[
-                NotaryHashStorage(
+                CustodiedHashStorage(
                     api_key="sk_asn_prod_...",
                     slug="tnt_acme_corp",
                 ),
@@ -57,13 +57,13 @@ class LangChainNotary(BaseCallbackHandler):  # type: ignore[misc]
 
     def __init__(
         self,
-        payload_storage: PayloadStorageConfig,
+        raw_payload_storage: RawPayloadStorage,
         hash_storage: list[HashStorage],
         debug: bool = False,
     ):
         # Initialize framework-agnostic core
         self.core = NotaryCore(
-            payload_storage=payload_storage,
+            raw_payload_storage=raw_payload_storage,
             hash_storage=hash_storage,
             debug=debug,
         )

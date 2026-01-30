@@ -12,7 +12,7 @@ import httpx
 import jcs
 
 from .arweave import ArweaveBackend
-from .config import ArweaveHashStorage, NotaryHashStorage, PayloadStorageConfig
+from .config import ArweaveHashStorage, CustodiedHashStorage, RawPayloadStorage
 
 try:
     __version__ = metadata.version("agentsystems-notary")
@@ -35,12 +35,12 @@ class LogResult:
     """Result from logging an interaction."""
 
     content_hash: str
-    notary_receipt: str | None = None
+    custodied_receipt: str | None = None
     arweave_tx_id: str | None = None
 
 
 # Type alias for hash storage options
-HashStorage = NotaryHashStorage | ArweaveHashStorage
+HashStorage = CustodiedHashStorage | ArweaveHashStorage
 
 
 class NotaryCore:
@@ -50,28 +50,28 @@ class NotaryCore:
     Handles canonicalization, hashing, and storage for any AI framework.
 
     Args:
-        payload_storage: Configuration for vendor's S3 bucket (full audit logs)
-        hash_storage: List of hash storage configurations (Notary API and/or Arweave)
+        raw_payload_storage: Configuration for vendor's S3 bucket (full audit logs)
+        hash_storage: List of hash storage configurations (custodied and/or Arweave)
         debug: Enable debug output (default: False)
 
     Example:
         ```python
         from agentsystems_notary import (
             NotaryCore,
-            PayloadStorageConfig,
-            NotaryHashStorage,
+            RawPayloadStorage,
+            CustodiedHashStorage,
         )
 
-        payload_storage = PayloadStorageConfig(
+        raw_payload_storage = RawPayloadStorage(
             bucket_name="my-audit-logs",
             aws_access_key_id="...",
             aws_secret_access_key="...",
         )
 
         core = NotaryCore(
-            payload_storage=payload_storage,
+            raw_payload_storage=raw_payload_storage,
             hash_storage=[
-                NotaryHashStorage(api_key="sk_asn_prod_...", slug="my_tenant"),
+                CustodiedHashStorage(api_key="sk_asn_prod_...", slug="my_tenant"),
             ],
         )
 
@@ -85,28 +85,28 @@ class NotaryCore:
 
     def __init__(
         self,
-        payload_storage: PayloadStorageConfig,
+        raw_payload_storage: RawPayloadStorage,
         hash_storage: list[HashStorage],
         debug: bool = False,
     ):
         if not hash_storage:
             raise ValueError("At least one hash_storage must be provided")
 
-        self.payload_storage = payload_storage
+        self.raw_payload_storage = raw_payload_storage
         self.hash_storage = hash_storage
         self.debug = debug
 
         # Separate hash storage by type
-        self._notary_storages = [
-            h for h in hash_storage if isinstance(h, NotaryHashStorage)
+        self._custodied_storages = [
+            h for h in hash_storage if isinstance(h, CustodiedHashStorage)
         ]
         self._arweave_storages = [
             h for h in hash_storage if isinstance(h, ArweaveHashStorage)
         ]
 
-        # Detect test mode from any Notary storage
+        # Detect test mode from any custodied storage
         self.is_test_mode = any(
-            h.api_key.startswith("sk_asn_test_") for h in self._notary_storages
+            h.api_key.startswith("sk_asn_test_") for h in self._custodied_storages
         )
 
         # Initialize Arweave backends
@@ -117,9 +117,9 @@ class NotaryCore:
         # S3 client with explicit credentials
         self.s3 = boto3.client(
             "s3",
-            aws_access_key_id=payload_storage.aws_access_key_id,
-            aws_secret_access_key=payload_storage.aws_secret_access_key,
-            region_name=payload_storage.aws_region,
+            aws_access_key_id=raw_payload_storage.aws_access_key_id,
+            aws_secret_access_key=raw_payload_storage.aws_secret_access_key,
+            region_name=raw_payload_storage.aws_region,
         )
 
         # Session tracking
@@ -152,14 +152,16 @@ class NotaryCore:
         """
         self.sequence += 1
 
-        # Build payload (include slug from first NotaryHashStorage if present)
-        first_notary = self._notary_storages[0] if self._notary_storages else None
+        # Build payload (include slug from first CustodiedHashStorage if present)
+        first_custodied = (
+            self._custodied_storages[0] if self._custodied_storages else None
+        )
         payload = {
             "metadata": {
                 "session_id": self.session_id,
                 "sequence": self.sequence,
                 "timestamp": datetime.now(UTC).isoformat(),
-                "slug": first_notary.slug if first_notary else None,
+                "slug": first_custodied.slug if first_custodied else None,
                 **(metadata or {}),
             },
             "input": input_data,
@@ -194,12 +196,16 @@ class NotaryCore:
 
         # 3. Write to hash storages (strict mode - any failure raises)
         # Each hash storage gets its own S3 path for clear separation
-        for notary_storage in self._notary_storages:
-            receipt, tenant_id = self._upload_to_notary(notary_storage, content_hash)
-            result.notary_receipt = receipt  # Last one wins if multiple
+        for custodied_storage in self._custodied_storages:
+            receipt, tenant_id = self._upload_to_custodied(
+                custodied_storage, content_hash
+            )
+            result.custodied_receipt = receipt  # Last one wins if multiple
             # Write full payload to S3 using tenant_id from API
             env = (
-                "test" if notary_storage.api_key.startswith("sk_asn_test_") else "prod"
+                "test"
+                if custodied_storage.api_key.startswith("sk_asn_test_")
+                else "prod"
             )
             self._write_to_s3(canonical_bytes, content_hash, tenant_id, env)
 
@@ -214,16 +220,16 @@ class NotaryCore:
 
         return result
 
-    def _upload_to_notary(
+    def _upload_to_custodied(
         self,
-        storage: NotaryHashStorage,
+        storage: CustodiedHashStorage,
         content_hash: str,
     ) -> tuple[str, str]:
         """
-        Upload hash to Notary API.
+        Upload hash to custodied storage API.
 
         Args:
-            storage: NotaryHashStorage configuration
+            storage: CustodiedHashStorage configuration
             content_hash: SHA-256 hash of canonical payload
 
         Returns:
@@ -248,10 +254,10 @@ class NotaryCore:
             tenant_id = result.get("tenant_id")
 
         if not tenant_id:
-            raise ValueError("Missing tenant_id from Notary API response")
+            raise ValueError("Missing tenant_id from custodied storage API response")
 
         if self.debug:
-            print(f"[Notary] Receipt: {receipt[:8]}...")
+            print(f"[Custodied] Receipt: {receipt[:8]}...")
 
         return receipt, tenant_id
 
@@ -270,14 +276,14 @@ class NotaryCore:
         Args:
             data_bytes: Canonical JSON bytes
             content_hash: SHA-256 hash (used in filename)
-            path_prefix: tenant_id (Notary) or namespace (Arweave)
+            path_prefix: tenant_id (custodied) or namespace (Arweave)
             env_prefix: "test", "prod", or "arweave"
         """
         date_path = datetime.now(UTC).strftime("%Y/%m/%d")
         key = f"{env_prefix}/{path_prefix}/{date_path}/{content_hash}.json"
 
         self.s3.put_object(
-            Bucket=self.payload_storage.bucket_name,
+            Bucket=self.raw_payload_storage.bucket_name,
             Key=key,
             Body=data_bytes,
             ContentType="application/json",
@@ -285,4 +291,4 @@ class NotaryCore:
         )
 
         if self.debug:
-            print(f"[S3] Saved: {self.payload_storage.bucket_name}/{key}")
+            print(f"[S3] Saved: {self.raw_payload_storage.bucket_name}/{key}")
