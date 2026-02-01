@@ -4,6 +4,77 @@ from dataclasses import dataclass
 
 
 @dataclass
+class AwsKmsSignerConfig:
+    """AWS KMS signer configuration.
+
+    Args:
+        kms_key_arn: AWS KMS key ARN for RSA-4096 signing
+        aws_access_key_id: AWS access key for KMS operations
+        aws_secret_access_key: AWS secret key for KMS operations
+        aws_region: AWS region for KMS (default: us-east-1)
+    """
+
+    kms_key_arn: str
+    aws_access_key_id: str
+    aws_secret_access_key: str
+    aws_region: str = "us-east-1"
+
+
+@dataclass
+class GcpKmsSignerConfig:
+    """GCP Cloud KMS signer configuration.
+
+    Args:
+        key_resource_name: Full resource name (projects/.../locations/...
+            /keyRings/.../cryptoKeys/.../cryptoKeyVersions/...)
+        credentials_path: Path to service account JSON file
+            (optional, uses ADC if not provided)
+    """
+
+    key_resource_name: str
+    credentials_path: str | None = None
+
+
+@dataclass
+class AzureKeyVaultSignerConfig:
+    """Azure Key Vault signer configuration.
+
+    Args:
+        vault_url: Key Vault URL (https://<vault-name>.vault.azure.net)
+        key_name: Name of the signing key
+        key_version: Specific key version (optional, uses latest if not provided)
+    """
+
+    vault_url: str
+    key_name: str
+    key_version: str | None = None
+
+
+@dataclass
+class LocalKeySignerConfig:
+    """Local private key signer configuration.
+
+    Exactly one of private_key_path or private_key_env_var must be provided.
+
+    Args:
+        private_key_path: Path to PEM file containing RSA-4096 private key
+        private_key_env_var: Environment variable name containing PEM-encoded key
+    """
+
+    private_key_path: str | None = None
+    private_key_env_var: str | None = None
+
+
+# Union type for signer configs
+SignerConfig = (
+    AwsKmsSignerConfig
+    | GcpKmsSignerConfig
+    | AzureKeyVaultSignerConfig
+    | LocalKeySignerConfig
+)
+
+
+@dataclass
 class RawPayloadStorage:
     """
     Configuration for raw payload storage (vendor's S3 bucket for full audit logs).
@@ -48,23 +119,23 @@ class ArweaveHashStorage:
     """
     Configuration for Arweave blockchain hash storage.
 
-    Hashes are signed with AWS KMS and uploaded to Arweave via a bundler.
+    Hashes are signed and uploaded to Arweave via a bundler.
     This provides decentralized, immutable verification without AgentSystems dependency.
+
+    Supports multiple signing backends:
+    - AWS KMS (AwsKmsSignerConfig)
+    - GCP Cloud KMS (GcpKmsSignerConfig)
+    - Azure Key Vault (AzureKeyVaultSignerConfig)
+    - Local RSA-4096 private key (LocalKeySignerConfig)
 
     Args:
         namespace: Anonymous identifier for enterprise customer (no PII)
-        kms_key_arn: AWS KMS key ARN for RSA-4096 signing
-        aws_access_key_id: AWS access key for KMS operations
-        aws_secret_access_key: AWS secret key for KMS operations
+        signer: Signer configuration (one of the SignerConfig types)
         bundler_url: Arweave bundler endpoint
-        aws_region: AWS region for KMS (default: us-east-1)
         explorer_url: Arweave explorer URL for debug output (optional)
     """
 
     namespace: str
-    kms_key_arn: str
-    aws_access_key_id: str
-    aws_secret_access_key: str
+    signer: SignerConfig
     bundler_url: str
-    aws_region: str = "us-east-1"
     explorer_url: str | None = None
