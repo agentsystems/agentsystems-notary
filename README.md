@@ -14,10 +14,6 @@ AgentSystems Notary provides tamper-evident audit trails for AI systems. It crea
 - **Cryptographic Verification**: SHA-256 hashes with JCS canonicalization (RFC 8785)
 - **Multi-Tenant Support**: Isolated audit trails for SaaS applications
 
-## Disclaimer
-
-This SDK provides technical infrastructure for audit logging. It does not guarantee regulatory compliance, which depends on your specific jurisdiction, industry, policies, and operational practices. This SDK does not constitute legal, compliance, or regulatory advice. Consult with qualified legal and compliance professionals for your specific requirements.
-
 ## Installation
 
 ```bash
