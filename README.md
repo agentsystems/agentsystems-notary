@@ -32,6 +32,7 @@ pip install langchain-anthropic
 
 ```python
 import os
+from dotenv import load_dotenv
 from agentsystems_notary import (
     LangChainNotary,
     RawPayloadStorage,
@@ -40,20 +41,31 @@ from agentsystems_notary import (
 )
 from langchain_anthropic import ChatAnthropic
 
-notary = LangChainNotary(
-    raw_payload_storage=RawPayloadStorage(
-        storage=AwsS3StorageConfig(
-            bucket_name=os.environ["ORG_AWS_S3_BUCKET_NAME"],
-            aws_access_key_id=os.environ["ORG_AWS_S3_ACCESS_KEY_ID"],
-            aws_secret_access_key=os.environ["ORG_AWS_S3_SECRET_ACCESS_KEY"],
-        ),
+load_dotenv()
+
+# Where full audit payloads are stored (your S3 bucket)
+raw_payload_storage = RawPayloadStorage(
+    storage=AwsS3StorageConfig(
+        bucket_name=os.environ["ORG_AWS_S3_BUCKET_NAME"],
+        aws_access_key_id=os.environ["ORG_AWS_S3_ACCESS_KEY_ID"],
+        aws_secret_access_key=os.environ["ORG_AWS_S3_SECRET_ACCESS_KEY"],
+        aws_region=os.environ["ORG_AWS_S3_REGION"],
     ),
-    hash_storage=[
-        CustodiedHashStorage(
-            api_key=os.environ["AGENTSYSTEMS_NOTARY_API_KEY"],
-            slug="my_tenant",
-        ),
-    ],
+)
+
+# Where hashes are stored for verification
+hash_storage = [
+    CustodiedHashStorage(
+        api_key=os.environ["AGENTSYSTEMS_NOTARY_API_KEY"],
+        slug="my_tenant",
+    ),
+]
+
+# Initialize notary
+notary = LangChainNotary(
+    raw_payload_storage=raw_payload_storage,
+    hash_storage=hash_storage,
+    debug=True,
 )
 
 model = ChatAnthropic(
@@ -73,6 +85,7 @@ pip install crewai
 
 ```python
 import os
+from dotenv import load_dotenv
 from agentsystems_notary import (
     CrewAINotary,
     RawPayloadStorage,
@@ -81,20 +94,31 @@ from agentsystems_notary import (
 )
 from crewai import Agent, Task, Crew, LLM
 
-notary = CrewAINotary(
-    raw_payload_storage=RawPayloadStorage(
-        storage=AwsS3StorageConfig(
-            bucket_name=os.environ["ORG_AWS_S3_BUCKET_NAME"],
-            aws_access_key_id=os.environ["ORG_AWS_S3_ACCESS_KEY_ID"],
-            aws_secret_access_key=os.environ["ORG_AWS_S3_SECRET_ACCESS_KEY"],
-        ),
+load_dotenv()
+
+# Where full audit payloads are stored (your S3 bucket)
+raw_payload_storage = RawPayloadStorage(
+    storage=AwsS3StorageConfig(
+        bucket_name=os.environ["ORG_AWS_S3_BUCKET_NAME"],
+        aws_access_key_id=os.environ["ORG_AWS_S3_ACCESS_KEY_ID"],
+        aws_secret_access_key=os.environ["ORG_AWS_S3_SECRET_ACCESS_KEY"],
+        aws_region=os.environ["ORG_AWS_S3_REGION"],
     ),
-    hash_storage=[
-        CustodiedHashStorage(
-            api_key=os.environ["AGENTSYSTEMS_NOTARY_API_KEY"],
-            slug="my_tenant",
-        ),
-    ],
+)
+
+# Where hashes are stored for verification
+hash_storage = [
+    CustodiedHashStorage(
+        api_key=os.environ["AGENTSYSTEMS_NOTARY_API_KEY"],
+        slug="my_tenant",
+    ),
+]
+
+# Initialize notary (hooks register automatically)
+notary = CrewAINotary(
+    raw_payload_storage=raw_payload_storage,
+    hash_storage=hash_storage,
+    debug=True,
 )
 
 llm = LLM(
@@ -131,7 +155,7 @@ raw_payload_storage = RawPayloadStorage(
         bucket_name="my-audit-logs",
         aws_access_key_id="...",
         aws_secret_access_key="...",
-        aws_region="us-east-1",  # optional, defaults to us-east-1
+        aws_region="us-east-1",
     ),
 )
 ```
@@ -150,7 +174,7 @@ CustodiedHashStorage(
 )
 ```
 
-**Arweave (Decentralized)** — Public blockchain, immutable, no vendor dependency.
+**Arweave (Decentralized)** — Public blockchain, permanent storage, no vendor dependency.
 ```python
 from agentsystems_notary import ArweaveHashStorage, AwsKmsSignerConfig
 
