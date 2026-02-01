@@ -75,15 +75,11 @@ SignerConfig = (
 
 
 @dataclass
-class RawPayloadStorage:
-    """
-    Configuration for raw payload storage (vendor's S3 bucket for full audit logs).
-
-    The vendor's S3 bucket receives the full JSON payload of every LLM interaction.
-    This is where the raw audit logs are stored for verification.
+class AwsS3StorageConfig:
+    """AWS S3 storage configuration.
 
     Args:
-        bucket_name: S3 bucket name for storing full audit payloads
+        bucket_name: S3 bucket name for storing payloads
         aws_access_key_id: AWS access key for S3 operations
         aws_secret_access_key: AWS secret key for S3 operations
         aws_region: AWS region (default: us-east-1)
@@ -93,6 +89,61 @@ class RawPayloadStorage:
     aws_access_key_id: str
     aws_secret_access_key: str
     aws_region: str = "us-east-1"
+
+
+@dataclass
+class GcpCloudStorageConfig:
+    """GCP Cloud Storage configuration.
+
+    Status: Under development. Not yet available for use.
+
+    Args:
+        bucket_name: GCS bucket name
+        credentials_path: Path to service account JSON file
+            (optional, uses ADC if not provided)
+    """
+
+    bucket_name: str
+    credentials_path: str | None = None
+
+
+@dataclass
+class AzureBlobStorageConfig:
+    """Azure Blob Storage configuration.
+
+    Status: Under development. Not yet available for use.
+
+    Args:
+        container_url: Blob container URL
+        container_name: Name of the blob container
+    """
+
+    container_url: str
+    container_name: str
+
+
+# Union type for storage configs
+StorageConfig = AwsS3StorageConfig | GcpCloudStorageConfig | AzureBlobStorageConfig
+
+
+@dataclass
+class RawPayloadStorage:
+    """
+    Configuration for raw payload storage (vendor's bucket for full audit logs).
+
+    The vendor's bucket receives the full JSON payload of every LLM interaction.
+    This is where the raw audit logs are stored for verification.
+
+    Supports multiple storage backends:
+    - AWS S3 (AwsS3StorageConfig)
+    - GCP Cloud Storage (GcpCloudStorageConfig) - coming soon
+    - Azure Blob Storage (AzureBlobStorageConfig) - coming soon
+
+    Args:
+        storage: Storage configuration (one of the StorageConfig types)
+    """
+
+    storage: StorageConfig
 
 
 @dataclass
