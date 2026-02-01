@@ -7,12 +7,12 @@ from datetime import UTC, datetime
 from importlib import metadata
 from typing import Any
 
-import boto3
 import httpx
 import jcs
 
 from .arweave import ArweaveBackend
 from .config import ArweaveHashStorage, CustodiedHashStorage, RawPayloadStorage
+from .storage import Storage, create_storage
 
 try:
     __version__ = metadata.version("agentsystems-notary")
@@ -114,13 +114,8 @@ class NotaryCore:
             ArweaveBackend(storage, debug) for storage in self._arweave_storages
         ]
 
-        # S3 client with explicit credentials
-        self.s3 = boto3.client(
-            "s3",
-            aws_access_key_id=raw_payload_storage.aws_access_key_id,
-            aws_secret_access_key=raw_payload_storage.aws_secret_access_key,
-            region_name=raw_payload_storage.aws_region,
-        )
+        # Initialize storage backend
+        self._storage: Storage = create_storage(raw_payload_storage.storage)
 
         # Session tracking
         self.session_id = str(uuid.uuid4())
@@ -207,7 +202,7 @@ class NotaryCore:
                 if custodied_storage.api_key.startswith("sk_asn_test_")
                 else "prod"
             )
-            self._write_to_s3(canonical_bytes, content_hash, tenant_id, env)
+            self._write_to_storage(canonical_bytes, content_hash, tenant_id, env)
 
         for i, arweave_backend in enumerate(self._arweave_backends):
             tx_id = arweave_backend.upload_hash(
@@ -216,7 +211,7 @@ class NotaryCore:
             result.arweave_tx_id = tx_id  # Last one wins if multiple
             # Write to S3 using namespace from Arweave storage
             namespace = self._arweave_storages[i].namespace
-            self._write_to_s3(canonical_bytes, content_hash, namespace, "arweave")
+            self._write_to_storage(canonical_bytes, content_hash, namespace, "arweave")
 
         return result
 
@@ -261,7 +256,7 @@ class NotaryCore:
 
         return receipt, tenant_id
 
-    def _write_to_s3(
+    def _write_to_storage(
         self,
         data_bytes: bytes,
         content_hash: str,
@@ -269,7 +264,7 @@ class NotaryCore:
         env_prefix: str,
     ) -> None:
         """
-        Write full payload to vendor's S3 bucket.
+        Write full payload to vendor's storage bucket.
 
         Path: {env_prefix}/{path_prefix}/{YYYY}/{MM}/{DD}/{hash}.json
 
@@ -282,13 +277,12 @@ class NotaryCore:
         date_path = datetime.now(UTC).strftime("%Y/%m/%d")
         key = f"{env_prefix}/{path_prefix}/{date_path}/{content_hash}.json"
 
-        self.s3.put_object(
-            Bucket=self.raw_payload_storage.bucket_name,
-            Key=key,
-            Body=data_bytes,
-            ContentType="application/json",
-            Metadata={"hash": content_hash},
+        self._storage.put_object(
+            key=key,
+            body=data_bytes,
+            content_type="application/json",
+            metadata={"hash": content_hash},
         )
 
         if self.debug:
-            print(f"[S3] Saved: {self.raw_payload_storage.bucket_name}/{key}")
+            print(f"[Storage] Saved: {self._storage.bucket_name}/{key}")

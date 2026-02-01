@@ -5,8 +5,11 @@ import pytest
 from agentsystems_notary import (
     ArweaveHashStorage,
     AwsKmsSignerConfig,
+    AwsS3StorageConfig,
+    AzureBlobStorageConfig,
     AzureKeyVaultSignerConfig,
     CustodiedHashStorage,
+    GcpCloudStorageConfig,
     GcpKmsSignerConfig,
     LocalKeySignerConfig,
     LogResult,
@@ -20,9 +23,11 @@ from agentsystems_notary import (
 # Helpers
 def make_raw_payload_storage() -> RawPayloadStorage:
     return RawPayloadStorage(
-        bucket_name="test-bucket",
-        aws_access_key_id="test-key",
-        aws_secret_access_key="test-secret",
+        storage=AwsS3StorageConfig(
+            bucket_name="test-bucket",
+            aws_access_key_id="test-key",
+            aws_secret_access_key="test-secret",
+        ),
     )
 
 
@@ -51,14 +56,56 @@ def test_version() -> None:
 
 
 def test_raw_payload_storage() -> None:
-    """Test RawPayloadStorage dataclass."""
-    config = RawPayloadStorage(
+    """Test RawPayloadStorage dataclass with AWS S3 storage."""
+    storage_config = AwsS3StorageConfig(
         bucket_name="my-bucket",
         aws_access_key_id="AKIA...",
         aws_secret_access_key="secret",
     )
-    assert config.bucket_name == "my-bucket"
-    assert config.aws_region == "us-east-1"  # default
+    config = RawPayloadStorage(storage=storage_config)
+    assert isinstance(config.storage, AwsS3StorageConfig)
+    assert config.storage.bucket_name == "my-bucket"
+    assert config.storage.aws_region == "us-east-1"  # default
+
+
+def test_gcp_cloud_storage_config() -> None:
+    """Test GcpCloudStorageConfig dataclass."""
+    config = GcpCloudStorageConfig(
+        bucket_name="my-gcs-bucket",
+    )
+    assert config.bucket_name == "my-gcs-bucket"
+    assert config.credentials_path is None  # Uses ADC by default
+
+
+def test_azure_blob_storage_config() -> None:
+    """Test AzureBlobStorageConfig dataclass."""
+    config = AzureBlobStorageConfig(
+        container_url="https://myaccount.blob.core.windows.net",
+        container_name="my-container",
+    )
+    assert config.container_url == "https://myaccount.blob.core.windows.net"
+    assert config.container_name == "my-container"
+
+
+def test_gcp_storage_not_implemented() -> None:
+    """Test GcpCloudStorage raises NotImplementedError (under development)."""
+    from agentsystems_notary.storage import GcpCloudStorage
+
+    config = GcpCloudStorageConfig(bucket_name="test-bucket")
+    with pytest.raises(NotImplementedError, match="under development"):
+        GcpCloudStorage(config)
+
+
+def test_azure_storage_not_implemented() -> None:
+    """Test AzureBlobStorage raises NotImplementedError (under development)."""
+    from agentsystems_notary.storage import AzureBlobStorage
+
+    config = AzureBlobStorageConfig(
+        container_url="https://test.blob.core.windows.net",
+        container_name="test",
+    )
+    with pytest.raises(NotImplementedError, match="under development"):
+        AzureBlobStorage(config)
 
 
 def test_custodied_hash_storage() -> None:
