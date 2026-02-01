@@ -2,7 +2,16 @@
 
 from importlib import metadata as _metadata
 
-from .config import ArweaveHashStorage, CustodiedHashStorage, RawPayloadStorage
+from .config import (
+    ArweaveHashStorage,
+    AwsKmsSignerConfig,
+    AzureKeyVaultSignerConfig,
+    CustodiedHashStorage,
+    GcpKmsSignerConfig,
+    LocalKeySignerConfig,
+    RawPayloadStorage,
+    SignerConfig,
+)
 from .core import LogResult, NotaryCore, PayloadTooLargeError
 
 __version__ = (
@@ -15,6 +24,11 @@ __all__ = [
     "RawPayloadStorage",
     "CustodiedHashStorage",
     "ArweaveHashStorage",
+    "AwsKmsSignerConfig",
+    "GcpKmsSignerConfig",
+    "AzureKeyVaultSignerConfig",
+    "LocalKeySignerConfig",
+    "SignerConfig",
     "LogResult",
     "PayloadTooLargeError",
 ]

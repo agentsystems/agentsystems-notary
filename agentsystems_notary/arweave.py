@@ -7,11 +7,10 @@ import struct
 from datetime import UTC, datetime
 from importlib import metadata
 
-import boto3
 import requests
-from cryptography.hazmat.primitives.serialization import load_der_public_key
 
 from .config import ArweaveHashStorage
+from .signing import Signer, create_signer
 
 try:
     __version__ = metadata.version("agentsystems-notary")
@@ -83,47 +82,21 @@ class ArweaveBackend:
     """
     Backend for uploading hashes to Arweave via ANS-104 data items.
 
-    Uses AWS KMS for RSA-4096 signing. The owner address (derived from the
-    KMS public key) identifies the vendor on Arweave.
+    Uses a pluggable Signer for RSA-4096 signing. The owner address (derived from the
+    public key) identifies the vendor on Arweave.
+
+    Supported signers:
+    - AWS KMS (AwsKmsSignerConfig)
+    - GCP Cloud KMS (GcpKmsSignerConfig)
+    - Azure Key Vault (AzureKeyVaultSignerConfig)
+    - Local RSA-4096 key (LocalKeySignerConfig)
     """
 
     def __init__(self, storage: ArweaveHashStorage, debug: bool = False):
         self.storage = storage
         self.debug = debug
-        self._session: boto3.Session | None = None
-        self._owner: bytes | None = None  # Cached RSA modulus
+        self._signer: Signer = create_signer(storage.signer)
         self._owner_address: str | None = None  # Cached base64url address
-
-    def _get_session(self) -> boto3.Session:
-        """Lazy-init boto3 session with explicit credentials."""
-        if self._session is None:
-            self._session = boto3.Session(
-                aws_access_key_id=self.storage.aws_access_key_id,
-                aws_secret_access_key=self.storage.aws_secret_access_key,
-                region_name=self.storage.aws_region,
-            )
-        return self._session
-
-    def _get_owner(self) -> bytes:
-        """Fetch and cache KMS public key modulus (owner)."""
-        if self._owner is None:
-            session = self._get_session()
-            kms = session.client("kms", region_name=self.storage.aws_region)
-            response = kms.get_public_key(KeyId=self.storage.kms_key_arn)
-
-            # Parse DER-encoded public key to extract RSA modulus
-            der_bytes = response["PublicKey"]
-            pub = load_der_public_key(der_bytes)
-            n = pub.public_numbers().n  # type: ignore[union-attr]
-
-            # Convert modulus to bytes (512 bytes for RSA-4096)
-            n_bytes = n.to_bytes((n.bit_length() + 7) // 8, "big")
-            self._owner = n_bytes
-
-            if self.debug:
-                print(f"[Arweave] Owner size: {len(n_bytes)} bytes")
-
-        return self._owner
 
     def get_owner_address(self) -> str:
         """
@@ -133,22 +106,9 @@ class ArweaveBackend:
         vendor's signing key on Arweave.
         """
         if self._owner_address is None:
-            owner = self._get_owner()
+            owner = self._signer.get_owner()
             self._owner_address = b64url_encode(sha256(owner))
         return self._owner_address
-
-    def _kms_sign(self, message: bytes) -> bytes:
-        """Sign a message using AWS KMS with RSASSA_PSS_SHA_256."""
-        session = self._get_session()
-        kms = session.client("kms", region_name=self.storage.aws_region)
-        response = kms.sign(
-            KeyId=self.storage.kms_key_arn,
-            Message=message,
-            MessageType="RAW",
-            SigningAlgorithm="RSASSA_PSS_SHA_256",
-        )
-        signature: bytes = response["Signature"]
-        return signature
 
     def _build_data_item(
         self, data: bytes, owner: bytes, tags: list[tuple[str, str]]
@@ -187,10 +147,10 @@ class ArweaveBackend:
             ]
         )
 
-        # Sign with KMS
+        # Sign with configured signer
         if self.debug:
-            print("[Arweave] Signing with AWS KMS...")
-        signature = self._kms_sign(to_sign)
+            print("[Arweave] Signing data item...")
+        signature = self._signer.sign(to_sign)
         if len(signature) != 512:
             raise ValueError(f"Expected 512-byte signature, got {len(signature)}")
 
@@ -270,7 +230,7 @@ class ArweaveBackend:
             ("SDK-Version", __version__),
         ]
 
-        owner = self._get_owner()
+        owner = self._signer.get_owner()
         data_item, data_item_id = self._build_data_item(data, owner, tags)
         result = self._upload_data_item(data_item)
 
