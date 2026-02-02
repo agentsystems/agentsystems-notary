@@ -330,3 +330,113 @@ def test_sequence_starts_at_zero() -> None:
         hash_storage=[make_custodied_storage()],
     )
     assert core.sequence == 0
+
+
+# LlamaIndex adapter tests
+class TestLlamaIndexAdapter:
+    """Tests for LlamaIndex adapter."""
+
+    def test_llamaindex_adapter_import_error(self) -> None:
+        """Test LlamaIndexNotary raises ImportError when llama-index not installed."""
+        from agentsystems_notary.llamaindex_adapter import (
+            LLAMAINDEX_AVAILABLE,
+            LlamaIndexNotary,
+        )
+
+        if not LLAMAINDEX_AVAILABLE:
+            with pytest.raises(ImportError, match="LlamaIndex is not installed"):
+                LlamaIndexNotary(
+                    raw_payload_storage=make_raw_payload_storage(),
+                    hash_storage=[make_custodied_storage()],
+                )
+
+    def test_llamaindex_adapter_class_exists(self) -> None:
+        """Test LlamaIndexNotary class is defined."""
+        from agentsystems_notary.llamaindex_adapter import LlamaIndexNotary
+
+        assert LlamaIndexNotary is not None
+
+    def test_llamaindex_adapter_has_core(self) -> None:
+        """Test LlamaIndexNotary initializes NotaryCore when llama-index available."""
+        from agentsystems_notary.llamaindex_adapter import (
+            LLAMAINDEX_AVAILABLE,
+            LlamaIndexNotary,
+        )
+
+        if LLAMAINDEX_AVAILABLE:
+            notary = LlamaIndexNotary(
+                raw_payload_storage=make_raw_payload_storage(),
+                hash_storage=[make_custodied_storage()],
+                auto_register=False,  # Don't auto-register in tests
+            )
+            assert notary.core is not None
+            assert hasattr(notary, "_pending_requests")
+
+    def test_llamaindex_adapter_class_name(self) -> None:
+        """Test LlamaIndexNotary class_name method."""
+        from agentsystems_notary.llamaindex_adapter import LlamaIndexNotary
+
+        assert LlamaIndexNotary.class_name() == "LlamaIndexNotary"
+
+
+# Agno adapter tests
+class TestAgnoAdapter:
+    """Tests for Agno adapter."""
+
+    def test_agno_adapter_import_error(self) -> None:
+        """Test AgnoNotary raises ImportError when agno not installed."""
+        from agentsystems_notary.agno_adapter import AGNO_AVAILABLE, AgnoNotary
+
+        if not AGNO_AVAILABLE:
+            with pytest.raises(ImportError, match="Agno is not installed"):
+                AgnoNotary(
+                    raw_payload_storage=make_raw_payload_storage(),
+                    hash_storage=[make_custodied_storage()],
+                )
+
+    def test_agno_adapter_class_exists(self) -> None:
+        """Test AgnoNotary class is defined."""
+        from agentsystems_notary.agno_adapter import AgnoNotary
+
+        assert AgnoNotary is not None
+
+    def test_agno_adapter_has_core(self) -> None:
+        """Test AgnoNotary initializes NotaryCore when agno available."""
+        from agentsystems_notary.agno_adapter import AGNO_AVAILABLE, AgnoNotary
+
+        if AGNO_AVAILABLE:
+            notary = AgnoNotary(
+                raw_payload_storage=make_raw_payload_storage(),
+                hash_storage=[make_custodied_storage()],
+            )
+            assert notary.core is not None
+            assert hasattr(notary, "_pending_requests")
+
+    def test_agno_adapter_get_hooks(self) -> None:
+        """Test AgnoNotary get_hooks returns correct structure."""
+        from agentsystems_notary.agno_adapter import AGNO_AVAILABLE, AgnoNotary
+
+        if AGNO_AVAILABLE:
+            notary = AgnoNotary(
+                raw_payload_storage=make_raw_payload_storage(),
+                hash_storage=[make_custodied_storage()],
+            )
+            hooks = notary.get_hooks()
+            assert "pre_hooks" in hooks
+            assert "post_hooks" in hooks
+            assert len(hooks["pre_hooks"]) == 1
+            assert len(hooks["post_hooks"]) == 1
+            assert callable(hooks["pre_hooks"][0])
+            assert callable(hooks["post_hooks"][0])
+
+    def test_agno_adapter_hook_properties(self) -> None:
+        """Test AgnoNotary exposes hook properties."""
+        from agentsystems_notary.agno_adapter import AGNO_AVAILABLE, AgnoNotary
+
+        if AGNO_AVAILABLE:
+            notary = AgnoNotary(
+                raw_payload_storage=make_raw_payload_storage(),
+                hash_storage=[make_custodied_storage()],
+            )
+            assert callable(notary.pre_hook)
+            assert callable(notary.post_hook)
