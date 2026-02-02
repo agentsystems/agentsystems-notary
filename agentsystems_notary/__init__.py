@@ -58,3 +58,17 @@ try:
     __all__.append("CrewAINotary")
 except ImportError:
     pass
+
+try:
+    from .llamaindex_adapter import LlamaIndexNotary  # noqa: F401
+
+    __all__.append("LlamaIndexNotary")
+except ImportError:
+    pass
+
+try:
+    from .agno_adapter import AgnoNotary  # noqa: F401
+
+    __all__.append("AgnoNotary")
+except ImportError:
+    pass
