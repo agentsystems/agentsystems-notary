@@ -183,10 +183,10 @@ class ArweaveHashStorage:
         namespace: Anonymous identifier for enterprise customer (no PII)
         signer: Signer configuration (one of the SignerConfig types)
         bundler_url: Arweave bundler endpoint (default: ArDrive Turbo)
-        explorer_url: Arweave explorer URL for debug output (optional)
+        explorer_url: Arweave explorer URL for debug output (default: ArScan)
     """
 
     namespace: str
     signer: SignerConfig
     bundler_url: str = "https://upload.ardrive.io/v1/tx/arweave"
-    explorer_url: str | None = None
+    explorer_url: str = "https://arscan.io/tx/"
