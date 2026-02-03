@@ -1,5 +1,6 @@
 """Agno adapter for Notary compliance logging."""
 
+import threading
 from collections.abc import Callable
 from typing import Any
 
@@ -89,6 +90,7 @@ class AgnoNotary:
         # Using a dict keyed by id to handle potential concurrent calls
         self._pending_requests: dict[int, dict[str, Any]] = {}
         self._request_counter = 0
+        self._counter_lock = threading.Lock()
 
     def _pre_hook(
         self,
@@ -141,8 +143,9 @@ class AgnoNotary:
                 agent_info["instructions"] = instructions
 
         # Store request data keyed by run_context for retrieval in post_hook
-        self._request_counter += 1
-        request_id = self._request_counter
+        with self._counter_lock:
+            self._request_counter += 1
+            request_id = self._request_counter
         self._pending_requests[request_id] = {
             "input": input_content,
             "agent": agent_info,
@@ -176,11 +179,7 @@ class AgnoNotary:
         # Retrieve request_id from run_context
         request_id = getattr(run_context, "_notary_request_id", None)
         if request_id is None:
-            # Fallback: use the most recent request
-            if self._pending_requests:
-                request_id = max(self._pending_requests.keys())
-            else:
-                return
+            return
 
         request_data = self._pending_requests.pop(request_id, None)
         if request_data is None:

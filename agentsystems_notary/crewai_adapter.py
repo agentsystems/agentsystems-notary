@@ -1,5 +1,6 @@
 """CrewAI adapter for Notary compliance logging."""
 
+import threading
 from typing import Any
 
 from .config import RawPayloadStorage
@@ -79,8 +80,10 @@ class CrewAINotary:
             debug=debug,
         )
 
-        # Temporary storage for request data
-        self._current_request: dict[str, Any] | None = None
+        # Pending requests keyed by request_id for concurrent call isolation
+        self._pending_requests: dict[int, dict[str, Any]] = {}
+        self._request_counter = 0
+        self._counter_lock = threading.Lock()
 
         # Register hooks with CrewAI
         self._register_hooks()
@@ -102,20 +105,34 @@ class CrewAINotary:
                         }
                     )
 
-            # Store request data
-            self._current_request = {
+            # Generate unique request_id with thread-safe counter
+            with self._counter_lock:
+                self._request_counter += 1
+                request_id = self._request_counter
+
+            # Store request data keyed by request_id
+            self._pending_requests[request_id] = {
                 "messages": messages,
                 "agent": context.agent.role if context.agent else None,
                 "task": context.task.description if context.task else None,
                 "crew": context.crew.name if hasattr(context.crew, "name") else None,
             }
 
+            # Attach request_id to context for retrieval in after_hook
+            context._notary_request_id = request_id
+
             return None  # Allow execution
 
         @after_llm_call  # type: ignore
         def _notary_after_llm(context: Any) -> None:
             """Capture LLM response and log to Notary."""
-            if self._current_request is None:
+            # Retrieve request_id from context
+            request_id = getattr(context, "_notary_request_id", None)
+            if request_id is None:
+                return None
+
+            request_data = self._pending_requests.pop(request_id, None)
+            if request_data is None:
                 return None
 
             # Extract response from context
@@ -135,7 +152,7 @@ class CrewAINotary:
 
             # Call framework-agnostic core
             self.core.log_interaction(
-                input_data=self._current_request,
+                input_data=request_data,
                 output_data=output_data,
                 metadata=metadata,
             )
