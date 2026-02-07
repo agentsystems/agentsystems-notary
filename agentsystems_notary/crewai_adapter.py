@@ -98,12 +98,20 @@ class CrewAINotary:
             messages = []
             if hasattr(context, "messages") and context.messages:
                 for msg in context.messages:
-                    messages.append(
-                        {
-                            "role": getattr(msg, "role", "unknown"),
-                            "content": getattr(msg, "content", str(msg)),
-                        }
-                    )
+                    if isinstance(msg, dict):
+                        messages.append(
+                            {
+                                "role": msg.get("role", "unknown"),
+                                "content": msg.get("content", str(msg)),
+                            }
+                        )
+                    else:
+                        messages.append(
+                            {
+                                "role": getattr(msg, "role", "unknown"),
+                                "content": getattr(msg, "content", str(msg)),
+                            }
+                        )
 
             # Generate unique request_id with thread-safe counter
             with self._counter_lock:
@@ -118,16 +126,22 @@ class CrewAINotary:
                 "crew": context.crew.name if hasattr(context.crew, "name") else None,
             }
 
-            # Attach request_id to context for retrieval in after_hook
-            context._notary_request_id = request_id
+            # Attach request_id to executor for retrieval in after_hook
+            # (before/after hooks get different LLMCallHookContext wrappers,
+            # but context.executor is the same CrewAgentExecutor instance)
+            if context.executor is not None:
+                context.executor._notary_request_id = request_id
+            else:
+                context._notary_request_id = request_id
 
             return None  # Allow execution
 
         @after_llm_call  # type: ignore
         def _notary_after_llm(context: Any) -> None:
             """Capture LLM response and log to Notary."""
-            # Retrieve request_id from context
-            request_id = getattr(context, "_notary_request_id", None)
+            # Retrieve request_id from executor (or context for direct calls)
+            target = context.executor if context.executor is not None else context
+            request_id = getattr(target, "_notary_request_id", None)
             if request_id is None:
                 return None
 
