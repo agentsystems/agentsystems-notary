@@ -176,10 +176,13 @@ class ArweaveBackend:
         if self.debug:
             url = self.storage.bundler_url
             print(f"[Arweave] Uploading {len(data_item)} bytes to {url}...")
+        headers: dict[str, str] = {"Content-Type": "application/octet-stream"}
+        if self.storage.bundler_api_key:
+            headers["x-api-key"] = self.storage.bundler_api_key
         response = requests.post(
             self.storage.bundler_url,
             data=data_item,
-            headers={"Content-Type": "application/octet-stream"},
+            headers=headers,
             timeout=30,
         )
         response.raise_for_status()
