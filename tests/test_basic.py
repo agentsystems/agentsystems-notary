@@ -1,5 +1,7 @@
 """Basic tests for agentsystems-notary."""
 
+import hashlib
+
 import pytest
 
 from agentsystems_notary import (
@@ -131,10 +133,52 @@ def test_arweave_hash_storage() -> None:
         signer=signer,
         bundler_url="https://test-bundler.example.com",
     )
-    assert storage.namespace == "my-namespace"
+    expected_hash = hashlib.sha256(b"my-namespace").hexdigest()
+    assert storage.namespace == expected_hash
     assert isinstance(storage.signer, AwsKmsSignerConfig)
     assert storage.signer.kms_key_arn == "arn:aws:kms:us-east-1:123:key/abc"
     assert storage.bundler_url == "https://test-bundler.example.com"
+
+
+def test_arweave_namespace_is_hashed() -> None:
+    """Test that namespace is SHA-256 hashed to 64-char hex string."""
+    storage = ArweaveHashStorage(
+        namespace="my-namespace",
+        signer=AwsKmsSignerConfig(
+            kms_key_arn="arn:aws:kms:us-east-1:123:key/abc",
+            aws_access_key_id="test-key",
+            aws_secret_access_key="test-secret",
+        ),
+    )
+    assert len(storage.namespace) == 64
+    assert all(c in "0123456789abcdef" for c in storage.namespace)
+
+
+def test_arweave_bundler_api_key_default() -> None:
+    """Test bundler_api_key defaults to empty string."""
+    storage = ArweaveHashStorage(
+        namespace="my-namespace",
+        signer=AwsKmsSignerConfig(
+            kms_key_arn="arn:aws:kms:us-east-1:123:key/abc",
+            aws_access_key_id="test-key",
+            aws_secret_access_key="test-secret",
+        ),
+    )
+    assert storage.bundler_api_key == ""
+
+
+def test_arweave_bundler_api_key_explicit() -> None:
+    """Test bundler_api_key can be set explicitly."""
+    storage = ArweaveHashStorage(
+        namespace="my-namespace",
+        signer=AwsKmsSignerConfig(
+            kms_key_arn="arn:aws:kms:us-east-1:123:key/abc",
+            aws_access_key_id="test-key",
+            aws_secret_access_key="test-secret",
+        ),
+        bundler_api_key="my-secret-key",
+    )
+    assert storage.bundler_api_key == "my-secret-key"
 
 
 def test_gcp_kms_signer_config() -> None:
