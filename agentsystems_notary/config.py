@@ -1,6 +1,5 @@
 """Configuration dataclasses for Notary SDK."""
 
-import hashlib
 from dataclasses import dataclass
 
 
@@ -184,6 +183,7 @@ class ArweaveHashStorage:
         namespace: Anonymous identifier for enterprise customer (no PII)
         signer: Signer configuration (one of the SignerConfig types)
         bundler_url: Arweave bundler endpoint (default: ArDrive Turbo)
+        bundler_api_key: API key for authenticated bundler endpoints (default: empty)
         explorer_url: Arweave explorer URL for debug output (default: ArScan)
     """
 
@@ -192,7 +192,3 @@ class ArweaveHashStorage:
     bundler_url: str = "https://upload.ardrive.io/v1/tx/arweave"
     bundler_api_key: str = ""
     explorer_url: str = "https://arscan.io/tx/"
-
-    def __post_init__(self) -> None:
-        """Hash the namespace to a 64-char lowercase hex SHA-256 string."""
-        self.namespace = hashlib.sha256(self.namespace.encode()).hexdigest()

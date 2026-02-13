@@ -210,21 +210,24 @@ class ArweaveBackend:
         notarized_at = now.isoformat()
         notarized_date_utc = now.strftime("%Y-%m-%d")
 
-        # Build receipt JSON
+        # Hash namespace for on-chain usage (bundler requires 64-char hex)
+        hashed_namespace = hashlib.sha256(self.storage.namespace.encode()).hexdigest()
+
+        # Build receipt JSON (on-chain, uses hashed namespace)
         receipt = {
             "hash": content_hash,
-            "namespace": self.storage.namespace,
+            "namespace": hashed_namespace,
             "notarized_at": notarized_at,
             "sdk_version": __version__,
             "v": "1",
         }
         data = json.dumps(receipt).encode("utf-8")
 
-        # Tags for discoverability
+        # Tags for discoverability (on-chain, uses hashed namespace)
         tags = [
             ("App-Name", "agentsystems-notary"),
             ("Content-Type", "application/json"),
-            ("Namespace", self.storage.namespace),
+            ("Namespace", hashed_namespace),
             ("Hash", content_hash),
             ("Session-ID", session_id),
             ("Sequence", str(sequence)),
