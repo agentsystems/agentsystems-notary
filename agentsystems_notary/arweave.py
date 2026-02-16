@@ -4,7 +4,7 @@ import base64
 import hashlib
 import json
 import struct
-import sys
+import warnings
 from datetime import UTC, datetime
 from importlib import metadata
 
@@ -107,18 +107,12 @@ class ArweaveBackend:
 
     def __init__(self, storage: ArweaveHashStorage, debug: bool = False):
         if not storage.bundler_url:
-            raise ValueError(
-                'bundler_url is required. Use "demo" for the rate-limited demo '
-                "instance, or deploy your own: "
-                "https://github.com/agentsystems/notary-arweave-bundler"
-            )
-        if storage.bundler_url == "demo":
             storage.bundler_url = DEMO_BUNDLER_URL
-            print(
-                "WARNING: Using the demo bundler. This instance is rate-limited "
+            warnings.warn(
+                "Using the demo bundler. This instance is rate-limited "
                 "and not suitable for production. Deploy your own: "
                 "https://github.com/agentsystems/notary-arweave-bundler",
-                file=sys.stderr,
+                stacklevel=2,
             )
         self.storage = storage
         self.debug = debug
