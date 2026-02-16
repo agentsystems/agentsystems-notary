@@ -4,6 +4,7 @@ import base64
 import hashlib
 import json
 import struct
+import sys
 from datetime import UTC, datetime
 from importlib import metadata
 
@@ -11,6 +12,18 @@ import requests
 
 from .config import ArweaveHashStorage
 from .signing import Signer, create_signer
+
+DEMO_BUNDLER_URL = "https://upload.ardrive.io/v1/tx/arweave"
+
+
+class BundlerError(Exception):
+    """Raised when the bundler returns a non-2xx response."""
+
+    def __init__(self, status_code: int, response_text: str):
+        self.status_code = status_code
+        self.response_text = response_text
+        super().__init__(f"Bundler returned {status_code}: {response_text}")
+
 
 try:
     __version__ = metadata.version("agentsystems-notary")
@@ -93,6 +106,20 @@ class ArweaveBackend:
     """
 
     def __init__(self, storage: ArweaveHashStorage, debug: bool = False):
+        if not storage.bundler_url:
+            raise ValueError(
+                'bundler_url is required. Use "demo" for the rate-limited demo '
+                "instance, or deploy your own: "
+                "https://github.com/agentsystems/notary-arweave-bundler"
+            )
+        if storage.bundler_url == "demo":
+            storage.bundler_url = DEMO_BUNDLER_URL
+            print(
+                "WARNING: Using the demo bundler. This instance is rate-limited "
+                "and not suitable for production. Deploy your own: "
+                "https://github.com/agentsystems/notary-arweave-bundler",
+                file=sys.stderr,
+            )
         self.storage = storage
         self.debug = debug
         self._signer: Signer = create_signer(storage.signer)
@@ -185,7 +212,8 @@ class ArweaveBackend:
             headers=headers,
             timeout=30,
         )
-        response.raise_for_status()
+        if not response.ok:
+            raise BundlerError(response.status_code, response.text)
         result: dict[str, str] = response.json()
         return result
 

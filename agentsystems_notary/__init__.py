@@ -2,6 +2,7 @@
 
 from importlib import metadata as _metadata
 
+from .arweave import BundlerError
 from .config import (
     ArweaveHashStorage,
     AwsKmsSignerConfig,
@@ -42,6 +43,7 @@ __all__ = [
     # Results and errors
     "LogResult",
     "PayloadTooLargeError",
+    "BundlerError",
 ]
 
 # Framework adapters (optional - only available if dependencies installed)
