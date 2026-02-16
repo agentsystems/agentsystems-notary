@@ -182,8 +182,7 @@ class ArweaveHashStorage:
     Args:
         namespace: Anonymous identifier for enterprise customer (no PII)
         signer: Signer configuration (one of the SignerConfig types)
-        bundler_url: Arweave bundler endpoint
-            (use "demo" for the rate-limited demo, or deploy your own)
+        bundler_url: Arweave bundler endpoint (default: demo)
         bundler_api_key: API key for authenticated bundler endpoints (default: empty)
         explorer_url: Arweave explorer URL for debug output (default: ArScan)
     """
