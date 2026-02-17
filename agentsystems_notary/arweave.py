@@ -108,15 +108,22 @@ class ArweaveBackend:
     def __init__(self, storage: ArweaveHashStorage, debug: bool = False):
         if not storage.bundler_url:
             storage.bundler_url = DEMO_BUNDLER_URL
+            border = "=" * 80
             print(
+                f"\n{border}\n"
+                "NOTICE: No bundler_url configured. Using demo bundler.\n"
                 "\n"
-                "=" * 80 + "\n"
-                "NOTICE: Using the demo Arweave bundler.\n"
+                "Arweave notarization requires a bundler to submit "
+                "transactions.\n"
+                "You are currently using a shared demo bundler, which is "
+                "for getting\n"
+                "started and testing, not for production.\n"
                 "\n"
-                "The demo bundler is for getting started and testing, "
-                "not for production.\n"
-                "Deploy your own on AWS in minutes:\n"
-                "https://github.com/agentsystems/notary-arweave-bundler\n" + "=" * 80,
+                "For reliable, dedicated throughput, deploy and connect "
+                "your own on AWS\n"
+                "in minutes:\n"
+                "https://github.com/agentsystems/notary-arweave-bundler\n"
+                f"{border}",
                 file=sys.stderr,
             )
         self.storage = storage
