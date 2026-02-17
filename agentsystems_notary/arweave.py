@@ -13,7 +13,7 @@ import requests
 from .config import ArweaveHashStorage
 from .signing import Signer, create_signer
 
-DEMO_BUNDLER_URL = "https://upload.ardrive.io/v1/tx/arweave"
+DEMO_BUNDLER_URL = "https://arweave-bundler.agentsystems.ai"
 
 
 class BundlerError(Exception):
@@ -111,17 +111,18 @@ class ArweaveBackend:
             border = "=" * 80
             print(
                 f"\n{border}\n"
-                "NOTICE: No bundler_url configured. Using demo bundler.\n"
+                "NOTICE: No bundler_url configured. Using demo bundler "
+                "(not for production).\n"
                 "\n"
-                "Arweave notarization requires a bundler to submit "
-                "transactions.\n"
+                "Notarization requires a bundler to aggregate and submit "
+                "hashes to Arweave.\n"
                 "You are currently using a shared demo bundler, which is "
                 "for getting\n"
-                "started and testing, not for production.\n"
+                "started and testing only.\n"
                 "\n"
                 "For reliable, dedicated throughput, deploy and connect "
-                "your own on AWS\n"
-                "in minutes:\n"
+                "your own bundler\n"
+                "on AWS in minutes:\n"
                 "https://github.com/agentsystems/notary-arweave-bundler\n"
                 f"{border}",
                 file=sys.stderr,
