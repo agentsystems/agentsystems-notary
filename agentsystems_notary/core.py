@@ -126,6 +126,7 @@ class NotaryCore:
         input_data: dict[str, Any],
         output_data: dict[str, Any],
         metadata: dict[str, Any] | None = None,
+        pre_execution_record: dict[str, Any] | None = None,
     ) -> LogResult:
         """
         Log an LLM interaction with cryptographic verification.
@@ -137,6 +138,9 @@ class NotaryCore:
             input_data: Framework-specific input (prompts, messages, etc.)
             output_data: Framework-specific output (response text, etc.)
             metadata: Additional metadata to include
+            pre_execution_record: Optional record of pre-execution state
+                (e.g. approval decisions, policy verdicts, authorization data
+                from control planes like Agno, Faramesh, etc.)
 
         Returns:
             LogResult with content hash and receipts/transaction IDs
@@ -151,7 +155,7 @@ class NotaryCore:
         first_custodied = (
             self._custodied_storages[0] if self._custodied_storages else None
         )
-        payload = {
+        payload: dict[str, Any] = {
             "metadata": {
                 "session_id": self.session_id,
                 "sequence": self.sequence,
@@ -162,6 +166,9 @@ class NotaryCore:
             "input": input_data,
             "output": output_data,
         }
+
+        if pre_execution_record is not None:
+            payload["pre_execution_record"] = pre_execution_record
 
         # 1. Canonicalize (deterministic JSON serialization)
         canonical_bytes = jcs.canonicalize(payload)

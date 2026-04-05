@@ -49,3 +49,6 @@ dmypy.json
 
 # Env
 .env
+
+# Local files
+local/

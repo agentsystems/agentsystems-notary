@@ -1,5 +1,7 @@
 """Basic tests for agentsystems-notary."""
 
+from typing import Any
+
 import pytest
 
 from agentsystems_notary import (
@@ -335,6 +337,143 @@ def test_payload_too_large_error() -> None:
     """Test PayloadTooLargeError can be raised."""
     with pytest.raises(PayloadTooLargeError):
         raise PayloadTooLargeError("test error")
+
+
+# Pre-execution record tests
+class TestPreExecutionRecord:
+    """Tests for pre_execution_record on log_interaction."""
+
+    def test_payload_includes_pre_execution_record(self) -> None:
+        """Test pre_execution_record appears in payload when provided."""
+        import jcs
+
+        core = NotaryCore(
+            raw_payload_storage=make_raw_payload_storage(),
+            hash_storage=[make_custodied_storage()],
+        )
+
+        pre_exec = {
+            "source": "faramesh",
+            "verdict": "PERMIT",
+            "policy_id": "policy-abc-123",
+        }
+
+        # Patch storage to capture the payload
+        captured: dict[str, Any] = {}
+        original_canonicalize = jcs.canonicalize
+
+        def capture_canonicalize(obj: Any) -> bytes:
+            captured.update(obj)
+            return original_canonicalize(obj)
+
+        import agentsystems_notary.core as core_module
+
+        original_jcs = core_module.jcs.canonicalize
+        core_module.jcs.canonicalize = capture_canonicalize
+
+        try:
+            # Will fail at storage upload, but we only need to verify payload shape
+            try:
+                core.log_interaction(
+                    input_data={"prompt": "hello"},
+                    output_data={"text": "hi"},
+                    pre_execution_record=pre_exec,
+                )
+            except Exception:
+                pass  # Expected — no real storage backend
+        finally:
+            core_module.jcs.canonicalize = original_jcs
+
+        assert "pre_execution_record" in captured
+        assert captured["pre_execution_record"] == pre_exec
+
+    def test_payload_omits_pre_execution_record_when_none(self) -> None:
+        """Test pre_execution_record is absent from payload when not provided."""
+        import jcs
+
+        core = NotaryCore(
+            raw_payload_storage=make_raw_payload_storage(),
+            hash_storage=[make_custodied_storage()],
+        )
+
+        captured: dict[str, Any] = {}
+        original_canonicalize = jcs.canonicalize
+
+        def capture_canonicalize(obj: Any) -> bytes:
+            captured.update(obj)
+            return original_canonicalize(obj)
+
+        import agentsystems_notary.core as core_module
+
+        original_jcs = core_module.jcs.canonicalize
+        core_module.jcs.canonicalize = capture_canonicalize
+
+        try:
+            try:
+                core.log_interaction(
+                    input_data={"prompt": "hello"},
+                    output_data={"text": "hi"},
+                )
+            except Exception:
+                pass
+        finally:
+            core_module.jcs.canonicalize = original_jcs
+
+        assert "pre_execution_record" not in captured
+
+    def test_pre_execution_record_with_nested_data(self) -> None:
+        """Test pre_execution_record works with nested/complex dicts."""
+        import jcs
+
+        core = NotaryCore(
+            raw_payload_storage=make_raw_payload_storage(),
+            hash_storage=[make_custodied_storage()],
+        )
+
+        pre_exec = {
+            "source": "agno",
+            "approval": {
+                "id": "appr_abc123",
+                "status": "approved",
+                "tool_name": "delete_user_data",
+                "tool_args": {"user_id": "123"},
+            },
+            "constraints": ["no-pii", "max-cost-0.50"],
+            "budget_remaining": 42.50,
+        }
+
+        captured: dict[str, Any] = {}
+        original_canonicalize = jcs.canonicalize
+
+        def capture_canonicalize(obj: Any) -> bytes:
+            captured.update(obj)
+            return original_canonicalize(obj)
+
+        import agentsystems_notary.core as core_module
+
+        original_jcs = core_module.jcs.canonicalize
+        core_module.jcs.canonicalize = capture_canonicalize
+
+        try:
+            try:
+                core.log_interaction(
+                    input_data={"prompt": "delete user 123"},
+                    output_data={"text": "done"},
+                    pre_execution_record=pre_exec,
+                )
+            except Exception:
+                pass
+        finally:
+            core_module.jcs.canonicalize = original_jcs
+
+        assert captured["pre_execution_record"] == pre_exec
+        assert captured["pre_execution_record"]["approval"]["tool_args"] == {
+            "user_id": "123"
+        }
+        assert captured["pre_execution_record"]["constraints"] == [
+            "no-pii",
+            "max-cost-0.50",
+        ]
 
 
 def test_session_id_generated() -> None:
