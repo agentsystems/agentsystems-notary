@@ -73,6 +73,7 @@ class AgnoNotary:
         raw_payload_storage: RawPayloadStorage,
         hash_storage: list[HashStorage],
         debug: bool = False,
+        pre_execution_record: dict[str, Any] | None = None,
     ):
         if not AGNO_AVAILABLE:
             raise ImportError(
@@ -85,6 +86,8 @@ class AgnoNotary:
             hash_storage=hash_storage,
             debug=debug,
         )
+
+        self._pre_execution_record = pre_execution_record
 
         # Temporary storage for request data
         # Using a dict keyed by id to handle potential concurrent calls
@@ -210,6 +213,7 @@ class AgnoNotary:
             input_data=request_data,
             output_data={"text": response_text},
             metadata=metadata,
+            pre_execution_record=self._pre_execution_record,
         )
 
     def get_hooks(self) -> dict[str, list[Callable[..., Any]]]:

@@ -67,6 +67,7 @@ class CrewAINotary:
         raw_payload_storage: RawPayloadStorage,
         hash_storage: list[HashStorage],
         debug: bool = False,
+        pre_execution_record: dict[str, Any] | None = None,
     ):
         if not CREWAI_AVAILABLE:
             raise ImportError(
@@ -79,6 +80,8 @@ class CrewAINotary:
             hash_storage=hash_storage,
             debug=debug,
         )
+
+        self._pre_execution_record = pre_execution_record
 
         # Pending requests keyed by request_id for concurrent call isolation
         self._pending_requests: dict[int, dict[str, Any]] = {}
@@ -169,6 +172,7 @@ class CrewAINotary:
                 input_data=request_data,
                 output_data=output_data,
                 metadata=metadata,
+                pre_execution_record=self._pre_execution_record,
             )
 
             return None  # Don't modify response
