@@ -179,13 +179,41 @@ class AgnoNotary:
             session: AgentSession with session state
             user_id: Optional user ID
         """
-        # Retrieve request_id from run_context
+        # Retrieve request data from pre_hook (if available)
         request_id = getattr(run_context, "_notary_request_id", None)
-        if request_id is None:
-            return
+        request_data: dict[str, Any] | None = None
+        if request_id is not None:
+            request_data = self._pending_requests.pop(request_id, None)
 
-        request_data = self._pending_requests.pop(request_id, None)
-        if request_data is None:
+        # Build input_data — from pre_hook if available, otherwise from run_output
+        input_data: dict[str, Any]
+        if request_data is not None:
+            input_data = request_data
+        elif run_output is not None:
+            # Resumed run (e.g. after approval) — pre_hook didn't fire
+            input_data = {}
+            if hasattr(run_output, "input") and run_output.input is not None:
+                run_input = run_output.input
+                if hasattr(run_input, "input_content"):
+                    content = run_input.input_content
+                    if isinstance(content, str):
+                        input_data["input"] = content
+                    else:
+                        input_data["input"] = str(content)
+            # Extract agent info if available
+            if agent is not None:
+                agent_info: dict[str, Any] = {}
+                if hasattr(agent, "name") and agent.name:
+                    agent_info["name"] = agent.name
+                if hasattr(agent, "model") and agent.model:
+                    model = agent.model
+                    if hasattr(model, "id"):
+                        agent_info["model_id"] = model.id
+                    elif hasattr(model, "model"):
+                        agent_info["model_id"] = model.model
+                if agent_info:
+                    input_data["agent"] = agent_info
+        else:
             return
 
         # Extract response from run_output
@@ -208,12 +236,63 @@ class AgnoNotary:
             if hasattr(run_output, "model") and run_output.model:
                 metadata["model"] = run_output.model
 
+        # Extract approval data from tools (if any)
+        pre_exec = self._pre_execution_record
+        if run_output is not None:
+            tools = getattr(run_output, "tools", None)
+            if tools:
+                approvals = []
+                for tool in tools:
+                    approval_id = getattr(tool, "approval_id", None)
+                    approval_type = getattr(tool, "approval_type", None)
+                    if approval_id is not None or approval_type is not None:
+                        record: dict[str, Any] = {
+                            "approval_type": approval_type,
+                            "tool_name": getattr(tool, "tool_name", None),
+                            "tool_args": getattr(tool, "tool_args", None),
+                        }
+                        if approval_id is not None:
+                            record["approval_id"] = approval_id
+
+                        # Confirmation status
+                        confirmed = getattr(tool, "confirmed", None)
+                        if confirmed is not None:
+                            record["confirmed"] = confirmed
+                        note = getattr(tool, "confirmation_note", None)
+                        if note is not None:
+                            record["confirmation_note"] = note
+
+                        # User input values
+                        answered = getattr(tool, "answered", None)
+                        if answered is not None:
+                            record["answered"] = answered
+                        schema = getattr(tool, "user_input_schema", None)
+                        if schema:
+                            user_input = {
+                                field.name: field.value
+                                for field in schema
+                                if hasattr(field, "name") and field.value is not None
+                            }
+                            if user_input:
+                                record["user_input"] = user_input
+
+                        # Tool result (tool return value or external execution result)
+                        tool_result = getattr(tool, "result", None)
+                        if tool_result is not None:
+                            record["tool_result"] = tool_result
+
+                        approvals.append(record)
+                if len(approvals) == 1:
+                    pre_exec = approvals[0]
+                elif len(approvals) > 1:
+                    pre_exec = {"approvals": approvals}
+
         # Call framework-agnostic core
         self.core.log_interaction(
-            input_data=request_data,
+            input_data=input_data,
             output_data={"text": response_text},
             metadata=metadata,
-            pre_execution_record=self._pre_execution_record,
+            pre_execution_record=pre_exec,
         )
 
     def get_hooks(self) -> dict[str, list[Callable[..., Any]]]:
