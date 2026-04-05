@@ -60,6 +60,7 @@ class LangChainNotary(BaseCallbackHandler):  # type: ignore[misc]
         raw_payload_storage: RawPayloadStorage,
         hash_storage: list[HashStorage],
         debug: bool = False,
+        pre_execution_record: dict[str, Any] | None = None,
     ):
         # Initialize framework-agnostic core
         self.core = NotaryCore(
@@ -67,6 +68,8 @@ class LangChainNotary(BaseCallbackHandler):  # type: ignore[misc]
             hash_storage=hash_storage,
             debug=debug,
         )
+
+        self._pre_execution_record = pre_execution_record
 
         # Pending requests keyed by run_id for concurrent call isolation
         self._pending_requests: dict[UUID, dict[str, Any]] = {}
@@ -108,6 +111,7 @@ class LangChainNotary(BaseCallbackHandler):  # type: ignore[misc]
             input_data=request_data,
             output_data={"text": response_text},
             metadata={},
+            pre_execution_record=self._pre_execution_record,
         )
 
     def on_llm_error(

@@ -86,6 +86,7 @@ class LlamaIndexNotary(BaseEventHandler):  # type: ignore[misc]
     # Pydantic fields - NotaryCore must be Any to avoid validation issues
     core: Any = None
     _pending_requests: dict[str, dict[str, Any]] = {}
+    _pre_execution_record: dict[str, Any] | None = None
 
     def __init__(
         self,
@@ -93,6 +94,7 @@ class LlamaIndexNotary(BaseEventHandler):  # type: ignore[misc]
         hash_storage: list[HashStorage],
         debug: bool = False,
         auto_register: bool = True,
+        pre_execution_record: dict[str, Any] | None = None,
     ):
         if not LLAMAINDEX_AVAILABLE:
             raise ImportError(
@@ -108,6 +110,7 @@ class LlamaIndexNotary(BaseEventHandler):  # type: ignore[misc]
                 debug=debug,
             ),
             _pending_requests={},
+            _pre_execution_record=pre_execution_record,
         )
 
         # Register with LlamaIndex dispatcher
@@ -195,4 +198,5 @@ class LlamaIndexNotary(BaseEventHandler):  # type: ignore[misc]
             input_data=request_data,
             output_data={"text": response_text},
             metadata=metadata,
+            pre_execution_record=self._pre_execution_record,
         )
