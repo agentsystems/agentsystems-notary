@@ -287,6 +287,22 @@ class AgnoNotary:
                 elif len(approvals) > 1:
                     pre_exec = {"approvals": approvals}
 
+            # Enrich with full approval record from metadata (if exposed by Agno)
+            if pre_exec is not None and pre_exec is not self._pre_execution_record:
+                approval_record = None
+                output_metadata = getattr(run_output, "metadata", None)
+                if isinstance(output_metadata, dict):
+                    approval_record = output_metadata.get("_approval")
+                if isinstance(approval_record, dict):
+                    for key in ("resolved_by", "resolved_at", "resolution_data"):
+                        value = approval_record.get(key)
+                        if value is not None:
+                            if (
+                                isinstance(pre_exec, dict)
+                                and "approvals" not in pre_exec
+                            ):
+                                pre_exec[key] = value
+
         # Call framework-agnostic core
         self.core.log_interaction(
             input_data=input_data,
