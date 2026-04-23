@@ -74,3 +74,10 @@ try:
     __all__.append("AgnoNotary")
 except ImportError:
     pass
+
+try:
+    from .agent_control_adapter import AgentControlNotarySink  # noqa: F401
+
+    __all__.append("AgentControlNotarySink")
+except ImportError:
+    pass
