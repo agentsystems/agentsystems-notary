@@ -606,3 +606,96 @@ class TestAgnoAdapter:
             )
             assert callable(notary.pre_hook)
             assert callable(notary.post_hook)
+
+
+# Agent Control adapter tests
+class TestAgentControlAdapter:
+    """Tests for Agent Control sink adapter."""
+
+    def test_agent_control_adapter_import_error(self) -> None:
+        """Raises ImportError when agent-control-sdk is not installed."""
+        from agentsystems_notary.agent_control_adapter import (
+            AGENT_CONTROL_AVAILABLE,
+            AgentControlNotarySink,
+        )
+
+        if not AGENT_CONTROL_AVAILABLE:
+            core = NotaryCore(
+                raw_payload_storage=make_raw_payload_storage(),
+                hash_storage=[make_custodied_storage()],
+            )
+            with pytest.raises(ImportError, match="Agent Control is not installed"):
+                AgentControlNotarySink(core)
+
+    def test_agent_control_adapter_class_exists(self) -> None:
+        """Test AgentControlNotarySink class is defined."""
+        from agentsystems_notary.agent_control_adapter import AgentControlNotarySink
+
+        assert AgentControlNotarySink is not None
+
+    def test_agent_control_adapter_has_core(self) -> None:
+        """Stores the core when agent-control-sdk is available."""
+        from agentsystems_notary.agent_control_adapter import (
+            AGENT_CONTROL_AVAILABLE,
+            AgentControlNotarySink,
+        )
+
+        if AGENT_CONTROL_AVAILABLE:
+            core = NotaryCore(
+                raw_payload_storage=make_raw_payload_storage(),
+                hash_storage=[make_custodied_storage()],
+            )
+            sink = AgentControlNotarySink(core)
+            assert sink.core is core
+
+    def test_agent_control_adapter_write_events_counts(self) -> None:
+        """Test AgentControlNotarySink returns accurate accepted/dropped counts."""
+        from agentsystems_notary.agent_control_adapter import (
+            AGENT_CONTROL_AVAILABLE,
+            AgentControlNotarySink,
+        )
+
+        if not AGENT_CONTROL_AVAILABLE:
+            return
+
+        # Fake core that counts calls and can be told to fail
+        class FakeCore:
+            def __init__(self, fail_after: int = -1):
+                self.calls = 0
+                self.fail_after = fail_after
+
+            def log_interaction(self, **kwargs: Any) -> None:
+                self.calls += 1
+                if self.fail_after >= 0 and self.calls > self.fail_after:
+                    raise RuntimeError("simulated failure")
+
+        # Fake event with the minimal fields the sink reads
+        class FakeEvent:
+            def __init__(self, name: str):
+                self.selector_path = "output"
+                self.check_stage = "post"
+                self.matched = True
+                self.action = "deny"
+                self._name = name
+
+            def model_dump(self, mode: str = "json") -> dict[str, Any]:
+                return {"control_name": self._name, "matched": True}
+
+        fake_core = FakeCore()
+        sink = AgentControlNotarySink(fake_core)  # type: ignore[arg-type]
+
+        # All succeed
+        result = sink.write_events(
+            [FakeEvent("a"), FakeEvent("b"), FakeEvent("c")]  # type: ignore[list-item]
+        )
+        assert result.accepted == 3
+        assert result.dropped == 0
+
+        # Second batch: one fails
+        fake_core_partial = FakeCore(fail_after=1)
+        sink_partial = AgentControlNotarySink(fake_core_partial)  # type: ignore[arg-type]
+        result = sink_partial.write_events(
+            [FakeEvent("a"), FakeEvent("b"), FakeEvent("c")]  # type: ignore[list-item]
+        )
+        assert result.accepted == 1
+        assert result.dropped == 2
