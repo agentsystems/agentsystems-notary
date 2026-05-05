@@ -699,3 +699,175 @@ class TestAgentControlAdapter:
         )
         assert result.accepted == 1
         assert result.dropped == 2
+
+
+# Faramesh adapter tests
+class TestFarameshAdapter:
+    """Tests for Faramesh audit-stream sink adapter."""
+
+    def test_faramesh_adapter_import_error(self) -> None:
+        """Raises ImportError when faramesh-sdk is not installed."""
+        from agentsystems_notary.faramesh_adapter import (
+            FARAMESH_AVAILABLE,
+            FarameshNotarySink,
+        )
+
+        if not FARAMESH_AVAILABLE:
+            core = NotaryCore(
+                raw_payload_storage=make_raw_payload_storage(),
+                hash_storage=[make_custodied_storage()],
+            )
+            with pytest.raises(ImportError, match="faramesh-sdk"):
+                FarameshNotarySink(core)
+
+    def test_faramesh_adapter_class_exists(self) -> None:
+        """FarameshNotarySink class is defined."""
+        from agentsystems_notary.faramesh_adapter import FarameshNotarySink
+
+        assert FarameshNotarySink is not None
+
+    def test_faramesh_adapter_has_core(self) -> None:
+        """Stores the core when faramesh-sdk is available."""
+        from agentsystems_notary.faramesh_adapter import (
+            FARAMESH_AVAILABLE,
+            FarameshNotarySink,
+        )
+
+        if FARAMESH_AVAILABLE:
+            core = NotaryCore(
+                raw_payload_storage=make_raw_payload_storage(),
+                hash_storage=[make_custodied_storage()],
+            )
+            sink = FarameshNotarySink(core)
+            assert sink.core is core
+
+    def test_faramesh_adapter_call_invokes_log_interaction(self) -> None:
+        """Calling the sink with an audit event delegates to log_interaction."""
+        from agentsystems_notary.faramesh_adapter import (
+            FARAMESH_AVAILABLE,
+            FarameshNotarySink,
+        )
+
+        if not FARAMESH_AVAILABLE:
+            return
+
+        captured: dict[str, Any] = {}
+
+        class FakeCore:
+            def log_interaction(self, **kwargs: Any) -> None:
+                captured.update(kwargs)
+
+        sink = FarameshNotarySink(FakeCore())  # type: ignore[arg-type]
+
+        event = {
+            "effect": "PERMIT",
+            "agent_id": "bot",
+            "tool_id": "search/query",
+            "operation": "invoke",
+            "args": {"q": "hello"},
+            "reason_code": "POLICY_PERMIT",
+            "latency_ms": 12,
+            "record_id": "r-1",
+        }
+        sink(event)
+
+        assert captured["pre_execution_record"] is event
+        assert captured["input_data"] == {
+            "tool_id": "search/query",
+            "operation": "invoke",
+            "args": {"q": "hello"},
+        }
+        assert captured["output_data"] == {
+            "effect": "PERMIT",
+            "reason_code": "POLICY_PERMIT",
+            "latency_ms": 12,
+        }
+
+    def test_faramesh_adapter_swallows_callback_errors(self) -> None:
+        """Errors inside log_interaction are logged but not re-raised."""
+        from agentsystems_notary.faramesh_adapter import (
+            FARAMESH_AVAILABLE,
+            FarameshNotarySink,
+        )
+
+        if not FARAMESH_AVAILABLE:
+            return
+
+        class ExplodingCore:
+            def log_interaction(self, **kwargs: Any) -> None:
+                raise RuntimeError("simulated failure")
+
+        sink = FarameshNotarySink(ExplodingCore())  # type: ignore[arg-type]
+        # Should not raise
+        sink({"effect": "PERMIT", "tool_id": "t1"})
+
+    def test_faramesh_adapter_skips_decision_mirror(self) -> None:
+        """event_type=decision mirrors audit_subscribe; skip to avoid double-record."""
+        from agentsystems_notary.faramesh_adapter import (
+            FARAMESH_AVAILABLE,
+            FarameshNotarySink,
+        )
+
+        if not FARAMESH_AVAILABLE:
+            return
+
+        calls: list[dict[str, Any]] = []
+
+        class FakeCore:
+            def log_interaction(self, **kwargs: Any) -> None:
+                calls.append(kwargs)
+
+        sink = FarameshNotarySink(FakeCore())  # type: ignore[arg-type]
+
+        # The daemon emits this for every decision on callback_subscribe.
+        # If the sink is wired to both streams, notarizing it would double-record.
+        sink(
+            {
+                "event_type": "decision",
+                "effect": "PERMIT",
+                "tool_id": "search/query/invoke",
+                "record_id": "r-1",
+            }
+        )
+        assert calls == []
+
+    def test_faramesh_adapter_handles_lifecycle_event(self) -> None:
+        """defer_resolved events from callback_subscribe map to status fields."""
+        from agentsystems_notary.faramesh_adapter import (
+            FARAMESH_AVAILABLE,
+            FarameshNotarySink,
+        )
+
+        if not FARAMESH_AVAILABLE:
+            return
+
+        captured: dict[str, Any] = {}
+
+        class FakeCore:
+            def log_interaction(self, **kwargs: Any) -> None:
+                captured.update(kwargs)
+
+        sink = FarameshNotarySink(FakeCore())  # type: ignore[arg-type]
+
+        event = {
+            "event_type": "defer_resolved",
+            "timestamp": "2026-05-05T12:00:00Z",
+            "defer_token": "07853696",
+            "status": "approved",
+            "approved": True,
+            "approver_id": "alice@example.com",
+            "reason": "approved via CLI",
+        }
+        sink(event)
+
+        assert captured["pre_execution_record"] is event
+        assert captured["input_data"] == {
+            "event_type": "defer_resolved",
+            "defer_token": "07853696",
+        }
+        assert captured["output_data"] == {
+            "status": "approved",
+            "approved": True,
+            "approver_id": "alice@example.com",
+            "reason": "approved via CLI",
+        }

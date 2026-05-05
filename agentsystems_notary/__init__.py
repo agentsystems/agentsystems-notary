@@ -81,3 +81,10 @@ try:
     __all__.append("AgentControlNotarySink")
 except ImportError:
     pass
+
+try:
+    from .faramesh_adapter import FarameshNotarySink  # noqa: F401
+
+    __all__.append("FarameshNotarySink")
+except ImportError:
+    pass
