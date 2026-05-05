@@ -110,8 +110,9 @@ class FarameshNotarySink:
         if not FARAMESH_AVAILABLE:
             raise ImportError(
                 "faramesh-sdk with the audit and callbacks modules is required. "
-                "Install with: pip install 'agentsystems-notary[faramesh]' "
-                "(or pip install 'faramesh-sdk>=0.4.0' directly)."
+                "These modules are pending upstream release; for now install "
+                "from the fork containing PR #<TODO> until faramesh-sdk>=0.4.0 "
+                "is published to PyPI."
             )
         self.core = core
 
