@@ -287,12 +287,15 @@ class AgnoNotary:
                 elif len(approvals) > 1:
                     pre_exec = {"approvals": approvals}
 
-            # Enrich with full approval record from metadata (if exposed by Agno)
+            # Enrich with the resolved approval record exposed by Agno via
+            # run_output.metadata["approval"] (populated when a paused run resumes).
             if pre_exec is not None and pre_exec is not self._pre_execution_record:
-                approval_record = None
                 output_metadata = getattr(run_output, "metadata", None)
-                if isinstance(output_metadata, dict):
-                    approval_record = output_metadata.get("_approval")
+                approval_record = (
+                    output_metadata.get("approval")
+                    if isinstance(output_metadata, dict)
+                    else None
+                )
                 if isinstance(approval_record, dict):
                     for key in ("resolved_by", "resolved_at", "resolution_data"):
                         value = approval_record.get(key)
